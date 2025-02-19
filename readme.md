@@ -10,7 +10,7 @@ Before running the script you need to have the following tools installed:
 
 
 ## Installation Steps
-1. Click the zip button on top of the webpage. If you are an advanced user, clone the repository.
+1. Click the Code button on top of the webpage. If you are an advanced user, clone the repository.
 2. Unpack the zip file or go into the folder and open a command line. If you are on Windows you can do that by clicking into the Link field in windows explorer and typing in cmd.
 3. Install all the dependencies using the following command (copy pasting this into the command prompt)
 ```pyton
