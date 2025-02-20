@@ -163,7 +163,7 @@ def download_videos():
         'format': 'bestvideo+bestaudio/best',
         'outtmpl': 'videos/%(title)s.%(ext)s',
         'noplaylist': True,
-
+        'match_filter': '!is_live',  # Skipping live streams. Hopefully at least
     }
     while True:
         try:
