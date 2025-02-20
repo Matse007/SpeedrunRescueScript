@@ -199,11 +199,12 @@ def save_highlights(highlights, client, highlights_filename, remaining_downloads
     with open(highlights_json_filename, "w", encoding="utf-8") as f:
         json.dump(highlights, f, indent=4)
 
-def download_videos(remaining_downloads_filename):
+def download_videos(remaining_downloads_filename, video_folder_name, download_type_str, game_or_username):
+    #pathlib.Path(download_folder_name).mkdir(parents=True, exist_ok=True)
     #downloading videos out of the provided dict using the yt-dlp module.
     ydl_options = {
         'format': 'bestvideo+bestaudio/best',
-        'outtmpl': 'videos/%(title)s.%(ext)s',
+        'outtmpl': f'{video_folder_name}/videos/{download_type_str}/{game_or_username}/%(title)s.%(ext)s',
         'noplaylist': True,
         'match_filter': filter_live, #uses a function to determine if the dead link now links to a stream and accidentially starts to download this instead. Hopefully should skip livestreams
         'verbose': True, # for debugging stuff
@@ -211,6 +212,7 @@ def download_videos(remaining_downloads_filename):
         'retries': 1,  # Retry a second time a bit later in case there was simply an issue
         'retry-delay': 10,  # Wait 10 seconds before retrying
     }
+
     while True:
         try:
             # Load URLs from JSON file
@@ -223,32 +225,36 @@ def download_videos(remaining_downloads_filename):
                 break
 
             first_url = urls[0]
-            print(f"Downloading: {str(first_url)}")
-            with yt_dlp.YoutubeDL(ydl_options) as ydl:
-                try:
-                    ydl.download([first_url])
+            if first_url.endswith("*****"):
+                first_url = first_url.replace("*****", "")
+                print(f"Downloading: {str(first_url)}")
+                with yt_dlp.YoutubeDL(ydl_options) as ydl:
+                    try:
+                        ydl.download([first_url])
 
-                except yt_dlp.utils.DownloadError as e:
-                    print(f"Skipping invalid or dead link: {first_url} - Error: {e}")
-                    urls.pop(0)
-                    with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
-                        json.dump(urls, f, indent=4)
-                    continue
+                    except yt_dlp.utils.DownloadError as e:
+                        print(f"Skipping invalid or dead link: {first_url} - Error: {e}")
+                        urls.pop(0)
+                        with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
+                            json.dump(urls, f, indent=4)
+                        continue
+    
+                    except yt_dlp.utils.ExtractorError as e:
+                        #In case you get rate limited. I did. It automatically goes through all downloads in this case and removes the urls unfairly.
+                        if "HTTP Error 403: Forbidden" in str(e):
+                            print(f"Error: {e}")
+                            print("There is a rate limit or some other access restriction (403 Forbidden).")
+                            if input("Do you want to stop and resume later? \nYour progress so far has been stored in the remaining_downloads.json (y/n): ").strip().lower().startswith("y"):
+                                with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
+                                    json.dump(urls, f, indent=4)
+                                print("Progress saved. You can resume the download later.")
+                                return  # Exit the function and resume later
+            else:
+                print(f"Skipping url {first_url}! (Not in danger)")
 
-                except yt_dlp.utils.ExtractorError as e:
-                    #In case you get rate limited. I did. It automatically goes through all downloads in this case and removes the urls unfairly.
-                    if "HTTP Error 403: Forbidden" in str(e):
-                        print(f"Error: {e}")
-                        print("There is a rate limit or some other access restriction (403 Forbidden).")
-                        if input("Do you want to stop and resume later? \nYour progress so far has been stored in the remaining_downloads.json (y/n): ").strip().lower().startswith("y"):
-                            with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
-                                json.dump(urls, f, indent=4)
-                            print("Progress saved. You can resume the download later.")
-                            return  # Exit the function and resume later
-
-                urls.pop(0)
-                with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
-                    json.dump(urls, f, indent=4)
+            urls.pop(0)
+            with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
+                json.dump(urls, f, indent=4)
 
         except FileNotFoundError:
             print("No remaining downloads file found")
@@ -303,7 +309,7 @@ async def main():
     #Check if there are remaining Downloads left.
     remaininDownloads = load_remaining_downloads(remaining_downloads_filename)
     if remaininDownloads and input("A remaining downloads file has been found. Do you want to continue the download? (y/n): ").lower().startswith("y"):
-        download_videos(config["remaining_downloads_file"])
+        download_videos(remaining_downloads_file, config["video_folder_name"], download_type_str, game_or_username)
         return
 
     if is_game:
@@ -335,10 +341,9 @@ async def main():
     print(f"Saved highlights to {highlights_filename}")
 
     # Download prompt for users and downloading videos
-    if highlights and input("Download videos? (y/n): ").lower().startswith("y"):
-        download_videos(remaining_downloads_filename)
+    if highlights and config["download_videos"]:
+        download_videos(remaining_downloads_filename, config["video_folder_name"], download_type_str, game_or_username)
         print("Download completed")
-
 
 if __name__ == "__main__":
     asyncio.run(main())
