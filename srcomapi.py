@@ -69,6 +69,11 @@ def get_in_loop_code(endpoint, params, cache_settings):
         endpoint_as_path.parent.mkdir(parents=True, exist_ok=True)
 
     if r.status_code != 200:
+        if r.status_code >= 400 and r.status_code < 500:
+            raise RuntimeError(f"API returned {r.status_code}: {r.reason}")
+
+        raise ConnectionError(f"Got status code {r.status_code}!")
+        #return r.reason, r.status_code
         #if r.status_code != 404:
         #    raise ConnectionError(f"Got status code {r.status_code}!")
         #
@@ -81,7 +86,6 @@ def get_in_loop_code(endpoint, params, cache_settings):
         #            f.write(str(r.status_code))
         #
         #return r.reason, r.status_code
-        raise RuntimeError(f"API returned {r.status_code}: {r.reason}")
 
     data = r.json()
 

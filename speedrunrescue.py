@@ -79,7 +79,7 @@ def get_all_runs_from_game(game_id):
 
     return runs
 
-twitch_url_regex = re.compile(r"(https?:\/\/)?(?:www\.)?twitch\.tv\/\S*", re.IGNORECASE)
+twitch_url_regex = re.compile(r"(https?:\/\/)?(?:www\.)?(?:m.)?(?:secure\.)?twitch\.tv\/\S*", re.IGNORECASE)
 def is_twitch_url(url):
     # Checking with regex if its a twitch highlight
     return twitch_url_regex.search(url)
@@ -156,6 +156,7 @@ def format_date_of_submission(dateobj):
 
 def save_highlights(highlights, client, highlights_filename, remaining_downloads_filename, highlights_json_filename):
     #saving all highlights in a formatted way for the user i guess? My hope is I can automate uploads later
+    num_at_risk = 0
     
     for highlight in highlights:
         new_twitch_urls = []
@@ -168,7 +169,11 @@ def save_highlights(highlights, client, highlights_filename, remaining_downloads
                 new_twitch_urls.append(twitch_url)
         highlight["urls"] = new_twitch_urls
         highlight["at_risk"] = at_risk
-    
+        if at_risk:
+            num_at_risk += 1
+
+    print(f"Number of at-risk runs: {num_at_risk}")
+
     with open(highlights_filename, "w", encoding="utf-8") as f:
         for entry in highlights:
             #formatting the iso format

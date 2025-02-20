@@ -6,8 +6,8 @@ import pathlib
 import itertools
 import re
 
-twitch_c_v_url_regex = re.compile(r"(?:https?:\/\/)?(?:www\.)?twitch\.tv\/(\w+)\/([cv])\/(\d+)", re.IGNORECASE)
-twitch_current_url_regex = re.compile(r"(?:https?:\/\/)?(?:www\.)?twitch\.tv\/videos/(\d+)", re.IGNORECASE)
+twitch_c_v_url_regex = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:m.)?(?:secure\.)?twitch\.tv\/(\w+)\/([cv])\/(\d+)", re.IGNORECASE)
+twitch_current_url_regex = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:m.)?(?:secure\.)?twitch\.tv\/videos/(\d+)", re.IGNORECASE)
 
 def grouper(iterable, n):
     it = iter(iterable)
@@ -67,7 +67,7 @@ class UserCache:
         if match_obj:
             url_type = match_obj.group(2)
             if url_type == "c":
-                if update_c_ignore_found:
+                if update_c:
                     user_info = self.get_user_info(match_obj.group(1))
                     user_info["c_video_urls"].append(video_url)
                     print(f"Skipped c-type url {video_url}")
