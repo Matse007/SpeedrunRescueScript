@@ -39,6 +39,11 @@ def get_user_id(username):
         print(f"Network error: {e}")
         return None
 
+def get_game_id(game):
+    data = req(f"{BASE_URL}/games?abbreviation={game}&max=1&_bulk=yes")
+
+    game_id = data["data"][0]["id"]
+    return game_id
 
 def get_all_runs(user_id):
     #gettign all runs with pagination in mind.
@@ -61,6 +66,26 @@ def get_all_runs(user_id):
 
     return runs
 
+def get_all_runs_from_game(game_id):
+    runs = []
+    offset = 0
+
+    while True:
+        url = f"{BASE_URL}/runs?game={game_id}&max=200&offset={offset}&status=verified&embed=game,category"
+        try:
+            print(f"offset: {offset}")
+            data = req(url)
+            runs.extend(data['data'])
+
+            # Pagination check
+            if data['pagination']['size'] < 200:
+                break
+            offset += 200
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching runs: {e}")
+            break
+
+    return runs
 
 def is_twitch_url(url):
     # Checking with regex if its a twitch highlight
@@ -159,25 +184,33 @@ def load_remaining_downloads():
         print(f"Unexpected error: {e}")
 
 def main():
+    DOWNLOAD_GAME = True
+
     #Check if there are remaining Downloads left.
     remaininDownloads = load_remaining_downloads()
     if remaininDownloads and input("A remaining downloads file has been found. Do you want to continue the download? (y/n): ").lower().startswith("y"):
         download_videos()
         return
 
-    username = input("Enter Speedrun.com username: ").strip()
-    print(f"Searching for {username}...")
+    #username = input("Enter Speedrun.com username: ").strip()
+    #print(f"Searching for {username}...")
 
-    # Getting the user id first from the username.
-    user_id = get_user_id(username)
-    if not user_id:
-        print("User not found")
-        return
-
-    # Fetch all runs from user
-    print("Fetching runs...")
-    runs = get_all_runs(user_id)
-    print(f"Found {len(runs)} verified runs")
+    if DOWNLOAD_GAME:
+        print(f"Searching for game")
+        game_id = get_game_id("pkmnredblue")
+        print(f"Getting all runs")
+        runs = get_all_runs_from_game(game_id)
+    else:
+        # Getting the user id first from the username.
+        user_id = get_user_id(username)
+        if not user_id:
+            print("User not found")
+            return
+    
+        # Fetch all runs from user
+        print("Fetching runs...")
+        runs = get_all_runs(user_id)
+        print(f"Found {len(runs)} verified runs")
 
     # Checking for highlights
     highlights = process_runs(runs)
