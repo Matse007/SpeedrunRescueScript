@@ -51,11 +51,10 @@ def get_all_runs(user_id):
     offset = 0
 
     while True:
-        url = f"{BASE_URL}/runs?user={user_id}&max=200&offset={offset}&status=verified&embed=game,category"
+        url = f"{BASE_URL}/runs?user={user_id}&max=200&offset={offset}&status=verified&embed=game,category,players"
         try:
             data = req(url)
             runs.extend(data['data'])
-
             # Pagination check
             if data['pagination']['size'] < 200:
                 break
@@ -63,7 +62,6 @@ def get_all_runs(user_id):
         except requests.exceptions.RequestException as e:
             print(f"Error fetching runs: {e}")
             break
-
     return runs
 
 def get_all_runs_from_game(game_id):
@@ -101,7 +99,6 @@ def process_runs(runs):
         twitch_urls = []
         for video in links:
             uri = video.get('uri', '')
-
             if is_twitch_url(uri):
                 twitch_urls.append(uri)
 
@@ -113,9 +110,11 @@ def process_runs(runs):
                 if player["rel"] == "guest":
                     player_names.append(player["name"])
                 else:
+                    user_data = player.get("data", {})
                     twitch_info = player.get("twitch")
                     if twitch_info is not None:
                         player_twitch_yt_urls.append(twitch_info["uri"])
+
                     youtube_info = player.get("youtube")
                     if youtube_info is not None:
                         player_twitch_yt_urls.append(youtube_info["uri"])
@@ -180,10 +179,18 @@ def download_videos():
             first_url = urls[0]
             print(f"Downloading: {first_url}")
             with yt_dlp.YoutubeDL(ydl_options) as ydl:
-                ydl.download([first_url])
-            urls.pop(0)
-            with open("remaining_downloads.json", "w", encoding="utf-8") as f:
-                json.dump(urls, f, indent=4)
+                try:
+                    ydl.download([first_url])
+                except yt_dlp.utils.DownloadError as e:
+                    print(f"Skipping invalid or dead link: {first_url} - Error: {e}")
+                    urls.pop(0)
+                    with open("remaining_downloads.json", "w", encoding="utf-8") as f:
+                        json.dump(urls, f, indent=4)
+                    continue
+
+                urls.pop(0)
+                with open("remaining_downloads.json", "w", encoding="utf-8") as f:
+                    json.dump(urls, f, indent=4)
 
         except FileNotFoundError:
             print("No remaining downloads file found")
@@ -196,7 +203,6 @@ def download_videos():
             break
         except Exception as e:
             print(f"Unexpected error: {e}")
-            break
 
 def load_remaining_downloads():
     try:
@@ -214,23 +220,23 @@ def load_remaining_downloads():
         print(f"Unexpected error: {e}")
 
 def main():
-    DOWNLOAD_GAME = True
-
     #Check if there are remaining Downloads left.
     remaininDownloads = load_remaining_downloads()
     if remaininDownloads and input("A remaining downloads file has been found. Do you want to continue the download? (y/n): ").lower().startswith("y"):
         download_videos()
         return
 
-    #username = input("Enter Speedrun.com username: ").strip()
-    #print(f"Searching for {username}...")
-
-    if DOWNLOAD_GAME:
-        print(f"Searching for game")
-        game_id = get_game_id("mmbn5")
+    if input("Do you want to backup a game? If no, this will default to users (y/n): ").lower().startswith("y"):
+        print("Enter Speedrun.com Game abbreviation.")
+        print("An example, (here in brackets) would be: speedrun.com/[sm64]. The abbreviation would be sm64")
+        game = input("Enter Speedrun.com Game abbreviation: ").strip()
+        print(f"Searching for {game}...")
+        game_id = get_game_id(game)
         print(f"Getting all runs")
         runs = get_all_runs_from_game(game_id)
     else:
+        username = input("Enter Speedrun.com username: ").strip()
+        print(f"Searching for {username}...")
         # Getting the user id first from the username.
         user_id = get_user_id(username)
         if not user_id:

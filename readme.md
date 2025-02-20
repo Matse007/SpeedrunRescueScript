@@ -24,3 +24,5 @@ pip install -r requirements.txt
 python speedrunrescue.py
 ```
 2. Just follow the instructions from the programm.
+
+Thank you to @luckytyphlosion for implementing game search
