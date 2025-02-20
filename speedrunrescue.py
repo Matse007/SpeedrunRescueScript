@@ -71,7 +71,7 @@ def get_all_runs_from_game(game_id):
     offset = 0
 
     while True:
-        url = f"{BASE_URL}/runs?game={game_id}&max=200&offset={offset}&status=verified&embed=game,category"
+        url = f"{BASE_URL}/runs?game={game_id}&max=200&offset={offset}&status=verified&embed=game,category,players"
         try:
             print(f"offset: {offset}")
             data = req(url)
@@ -87,11 +87,10 @@ def get_all_runs_from_game(game_id):
 
     return runs
 
+twitch_url_regex = re.compile(r"https?:\/\/(?:www\.)?twitch\.tv\/\S*", re.IGNORECASE)
 def is_twitch_url(url):
     # Checking with regex if its a twitch highlight
-    pattern = r"https?:\/\/(?:www\.)?twitch\.tv\/\S*"
-    return re.match(pattern, url, re.IGNORECASE)
-
+    return twitch_url_regex.search(url)
 
 def process_runs(runs):
     #Extract Twitch highlight urls from runs
@@ -99,18 +98,43 @@ def process_runs(runs):
     for run in runs:
         videos = run.get('videos') or {}
         links = videos.get('links') or []
-
+        twitch_urls = []
         for video in links:
             uri = video.get('uri', '')
+
             if is_twitch_url(uri):
-                highlights.append({
-                    'game': run['game']['data']['names']['international'],
-                    'category': run['category']['data']['name'],
-                    'time': run['times']['primary'],
-                    'url': uri,
-                    'run_id': run['id']
-                })
-                break
+                twitch_urls.append(uri)
+
+        if len(twitch_urls) != 0:
+            player_twitch_yt_urls = []
+            player_datas = run["players"]["data"]
+            player_names = []
+            for player in player_datas:
+                if player["rel"] == "guest":
+                    player_names.append(player["name"])
+                else:
+                    twitch_info = player.get("twitch")
+                    if twitch_info is not None:
+                        player_twitch_yt_urls.append(twitch_info["uri"])
+                    youtube_info = player.get("youtube")
+                    if youtube_info is not None:
+                        player_twitch_yt_urls.append(youtube_info["uri"])
+
+                    player_names.append(player["names"]["international"])
+
+            highlight = {
+                'players': player_names,
+                'game': run['game']['data']['names']['international'],
+                'category': run['category']['data']['name'],
+                'time': run['times']['primary'],
+                'urls': twitch_urls,
+                'run_id': run['id']
+            }
+
+            if len(player_twitch_yt_urls) != 0:
+                highlight["vod_sites"] = player_twitch_yt_urls
+
+            highlights.append(highlight)
 
     return highlights
 
@@ -118,14 +142,20 @@ def save_highlights(highlights):
     #saving all highlights in a formatted way for the user i guess? My hope is I can automate uploads later
     with open(HIGHLIGHTS_FILE, "w", encoding="utf-8") as f:
         for entry in highlights:
-            f.write(f"Game: {entry['game']}\n")
+            f.write(f"Players: {', '.join(entry['players'])}\n")
             f.write(f"Category: {entry['category']}\n")
             f.write(f"Time: {str(parse_duration(entry['time']))}\n")
-            f.write(f"URL: {entry['url']}\n")
+            f.write(f"URL: {' '.join(entry['urls'])}\n")
             f.write(f"Run ID: {entry['run_id']}\n")
+            vod_sites = entry.get("vod_sites")
+            if vod_sites is not None:
+                f.write(f"Vod sites: {' '.join(vod_sites)}\n")
+
             f.write("-" * 50 + "\n")
+
+    urls = [url for entry in highlights for url in entry["urls"]]
     with open("remaining_downloads.json", "w", encoding="utf-8") as f:
-        json.dump([entry['url'] for entry in highlights], f, indent=4)
+        json.dump(urls, f, indent=4)
 
 
 def download_videos():
@@ -197,7 +227,7 @@ def main():
 
     if DOWNLOAD_GAME:
         print(f"Searching for game")
-        game_id = get_game_id("pkmnredblue")
+        game_id = get_game_id("mmbn5")
         print(f"Getting all runs")
         runs = get_all_runs_from_game(game_id)
     else:
