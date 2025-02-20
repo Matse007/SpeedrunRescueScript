@@ -90,6 +90,14 @@ def is_twitch_url(url):
     # Checking with regex if its a twitch highlight
     return twitch_url_regex.search(url)
 
+#Checking if a stream is live. Only happens if its an old dead link that redirects to the channel and the channel is live
+def filter_live(info):
+    # If the video is live, return a string indicating the reason for skipping.
+    if info.get('is_live', False):
+        return "Skipping live stream"
+    # Otherwise, return None to allow the video.
+    return None
+
 def process_runs(runs):
     #Extract Twitch highlight urls from runs
     highlights = []
@@ -163,7 +171,11 @@ def download_videos():
         'format': 'bestvideo+bestaudio/best',
         'outtmpl': 'videos/%(title)s.%(ext)s',
         'noplaylist': True,
-        'match_filter': '!is_live',  # Skipping live streams. Hopefully at least
+        'match_filter': filter_live, #uses a function to determine if the dead link now links to a stream and accidentially starts to download this instead. Hopefully should skip livestreams
+        'verbose': True, # for debugging stuff
+        'sleep-interval': 5, #so i dont get insta blacklisted by twitch
+        'retries': 1,  # Retry a second time a bit later in case there was simply an issue
+        'retry-delay': 10,  # Wait 10 seconds before retrying
     }
     while True:
         try:
@@ -177,16 +189,28 @@ def download_videos():
                 break
 
             first_url = urls[0]
-            print(f"Downloading: {first_url}")
+            print(f"Downloading: {str(first_url)}")
             with yt_dlp.YoutubeDL(ydl_options) as ydl:
                 try:
                     ydl.download([first_url])
+
                 except yt_dlp.utils.DownloadError as e:
                     print(f"Skipping invalid or dead link: {first_url} - Error: {e}")
                     urls.pop(0)
                     with open("remaining_downloads.json", "w", encoding="utf-8") as f:
                         json.dump(urls, f, indent=4)
                     continue
+
+                except yt_dlp.utils.ExtractorError as e:
+                    #In case you get rate limited. I did. It automatically goes through all downloads in this case and removes the urls unfairly.
+                    if "HTTP Error 403: Forbidden" in str(e):
+                        print(f"Error: {e}")
+                        print("There is a rate limit or some other access restriction (403 Forbidden).")
+                        if input("Do you want to stop and resume later? \nYour progress so far has been stored in the remaining_downloads.json (y/n): ").strip().lower().startswith("y"):
+                            with open("remaining_downloads.json", "w", encoding="utf-8") as f:
+                                json.dump(urls, f, indent=4)
+                            print("Progress saved. You can resume the download later.")
+                            return  # Exit the function and resume later
 
                 urls.pop(0)
                 with open("remaining_downloads.json", "w", encoding="utf-8") as f:
