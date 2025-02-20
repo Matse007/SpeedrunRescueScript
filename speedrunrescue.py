@@ -203,7 +203,11 @@ def save_highlights(highlights, client, is_game, highlights_filename, remaining_
 
             f.write("-" * 50 + "\n")
 
-    urls = [url for entry in highlights for url in entry["urls"]]
+    urls = []
+    for entry in highlights:
+        src_link = f"https://speedrun.com/{entry['abbreviation']}/runs/{entry['run_id']}"
+        urls.extend((url, src_link) for url in entry["urls"])
+
     with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
         json.dump(urls, f, indent=4)
     with open(highlights_json_filename, "w", encoding="utf-8") as f:
@@ -212,20 +216,26 @@ def save_highlights(highlights, client, is_game, highlights_filename, remaining_
 def download_videos(remaining_downloads_filename, video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username):
     #pathlib.Path(download_folder_name).mkdir(parents=True, exist_ok=True)
     #downloading videos out of the provided dict using the yt-dlp module.
-    ydl_options = {
-        'format': 'bestvideo+bestaudio/best',
-        'outtmpl': f'{video_folder_name}/{download_type_str}/{game_or_username}/%(title)s_%(id)s.%(ext)s',
-        'noplaylist': True,
-        'match_filter': filter_live, #uses a function to determine if the dead link now links to a stream and accidentially starts to download this instead. Hopefully should skip livestreams
-        "print_to_file": {"after_video": ("""\
+    
+    download_info_template = """\
 URL: %(original_url)s
-Channel: %(channel)s
+speedrun.com URL: {src_url}
+Channel: %(uploader_id)s
 Title: %(title)s
 Date: %(upload_date>%Y-%m-%d)s
 Duration: %(duration>%H:%M:%S)s
 Description:
 %(description)s
-==========================================================""", downloaded_video_info_filename)},
+=========================================================="""
+
+    print_to_file_list = [[download_info_template, downloaded_video_info_filename]]
+
+    ydl_options = {
+        'format': 'bestvideo+bestaudio/best',
+        'outtmpl': f'{video_folder_name}/{download_type_str}/{game_or_username}/%(title)s_%(id)s.%(ext)s',
+        'noplaylist': True,
+        'match_filter': filter_live, #uses a function to determine if the dead link now links to a stream and accidentially starts to download this instead. Hopefully should skip livestreams
+        "print_to_file": {"after_video": print_to_file_list},
         'verbose': True, # for debugging stuff
         'sleep-interval': 5, #so i dont get insta blacklisted by twitch
         'retries': 1,  # Retry a second time a bit later in case there was simply an issue
@@ -243,10 +253,17 @@ Description:
                 print("All downloads completed!")
                 break
 
-            first_url = urls[0]
+            url_info = urls[0]
+            if isinstance(url_info, list):
+                first_url, src_link = url_info
+            else:
+                first_url = url_info
+                src_link = "N/A"
+
             if first_url.endswith("*****"):
                 first_url = first_url.replace("*****", "")
                 print(f"Downloading: {str(first_url)}")
+                print_to_file_list[0][0] = download_info_template.format(src_url=src_link)
                 with yt_dlp.YoutubeDL(ydl_options) as ydl:
                     try:
                         ydl.download([first_url])
@@ -284,8 +301,14 @@ Description:
         except yt_dlp.utils.DownloadError as e:
             print(f"Failed to download {first_url}: {e}")
             break
-        except Exception as e:
-            print(f"Unexpected error: {e}")
+        #except Exception as e:
+#            raise
+#            error_output = f"""\
+#Unexpected error: {e}
+#Error type: {e.__class__.__name__}
+#Traceback (most recent call last)
+#{''.join(traceback.format_tb(e.__traceback__))}"""
+#            print(f"Unexpected error: {e}")
 
 def load_remaining_downloads(remaining_downloads_filename):
     try:
@@ -301,6 +324,7 @@ def load_remaining_downloads(remaining_downloads_filename):
         print("Error reading JSON file")
     except Exception as e:
         print(f"Unexpected error: {e}")
+
 
 async def main():
     ap = configargparse.ArgumentParser(
