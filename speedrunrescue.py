@@ -5,12 +5,14 @@ from urllib.parse import quote
 from isodate import parse_duration
 import yt_dlp
 import json
+from datetime import datetime
 
 # Configuration
 BASE_URL = "https://www.speedrun.com/api/v1"
 RATE_LIMIT = 0.6  # 600ms between requests because rate limits. Something I learned today
 DEBUG_FILE = "debug_log.txt"
 HIGHLIGHTS_FILE = "twitch_highlights.txt"
+HIGHLIGHTS_JSON = "twitch_highlights.json"
 DOWNLOADS_REMAINING_FILE = "downloads_remaining.json"
 timestamp = time.time()
 jsonData ={}
@@ -135,7 +137,10 @@ def process_runs(runs):
                 'category': run['category']['data']['name'],
                 'time': run['times']['primary'],
                 'urls': twitch_urls,
-                'run_id': run['id']
+                'run_id': run['id'],
+                'submitted': run.get('submitted', 'Unknown date'),
+                'date': run.get('date', 'Unknown date'),
+                'comment': run.get('comment', '')
             }
 
             if len(player_twitch_yt_urls) != 0:
@@ -145,15 +150,27 @@ def process_runs(runs):
 
     return highlights
 
+def format_date_of_submission(dateobj):
+    try:
+        formatted_date = datetime.fromisoformat(dateobj).strftime("%B %d, %Y")
+    except (KeyError, ValueError, TypeError):
+        formatted_date = "Unknown date"
+    return formatted_date
+
 def save_highlights(highlights):
     #saving all highlights in a formatted way for the user i guess? My hope is I can automate uploads later
     with open(HIGHLIGHTS_FILE, "w", encoding="utf-8") as f:
         for entry in highlights:
+            #formatting the iso format
+
             f.write(f"Players: {', '.join(entry['players'])}\n")
             f.write(f"Category: {entry['category']}\n")
             f.write(f"Time: {str(parse_duration(entry['time']))}\n")
+            f.write(f"Submitted Date: {format_date_of_submission(entry['submitted'])}\n")
+            f.write(f"Run Date: {format_date_of_submission(entry['date'])}\n")
             f.write(f"URL: {' '.join(entry['urls'])}\n")
             f.write(f"Run ID: {entry['run_id']}\n")
+            f.write(f"Comment: {entry['comment']}\n")
             vod_sites = entry.get("vod_sites")
             if vod_sites is not None:
                 f.write(f"Vod sites: {' '.join(vod_sites)}\n")
@@ -163,6 +180,8 @@ def save_highlights(highlights):
     urls = [url for entry in highlights for url in entry["urls"]]
     with open("remaining_downloads.json", "w", encoding="utf-8") as f:
         json.dump(urls, f, indent=4)
+    with open(HIGHLIGHTS_JSON, "w", encoding="utf-8") as f:
+        json.dump(highlights, f, indent=4)
 
 
 def download_videos():

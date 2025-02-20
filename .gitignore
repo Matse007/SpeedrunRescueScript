@@ -173,3 +173,4 @@ cython_debug/
 /twitch_highlights.txt
 virt/
 remaining_downloads.json
+twitch_highlights.json
