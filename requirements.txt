@@ -1,3 +1,4 @@
 requests~=2.32.3
 yt-dlp~=2025.2.19
 isodate~=0.7.2
+twitchAPI~=4.4.0
