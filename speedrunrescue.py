@@ -157,12 +157,15 @@ def format_date_of_submission(dateobj):
 def save_highlights(highlights, client, highlights_filename, remaining_downloads_filename, highlights_json_filename):
     #saving all highlights in a formatted way for the user i guess? My hope is I can automate uploads later
     num_at_risk = 0
+    with open("config.json") as f:
+        config = json.load(f)
+    download_all = config.get("allow_all_downloads", False)
     
     for highlight in highlights:
         new_twitch_urls = []
         at_risk = False
         for twitch_url in highlight["urls"]:
-            if client.is_video_at_risk(twitch_url):
+            if client.is_video_at_risk(twitch_url) or download_all:
                 at_risk = True
                 new_twitch_urls.append(f"{twitch_url}*****")
             else:
@@ -201,6 +204,11 @@ def save_highlights(highlights, client, highlights_filename, remaining_downloads
 
 def download_videos(remaining_downloads_filename, video_folder_name, download_type_str, game_or_username):
     #pathlib.Path(download_folder_name).mkdir(parents=True, exist_ok=True)
+    # Load configuration
+    with open("config.json", "r") as f:
+        config = json.load(f)
+    allow_all = config.get("allow_all_downloads", False)
+
     #downloading videos out of the provided dict using the yt-dlp module.
     ydl_options = {
         'format': 'bestvideo+bestaudio/best',
@@ -211,6 +219,7 @@ def download_videos(remaining_downloads_filename, video_folder_name, download_ty
         'sleep-interval': 5, #so i dont get insta blacklisted by twitch
         'retries': 1,  # Retry a second time a bit later in case there was simply an issue
         'retry-delay': 10,  # Wait 10 seconds before retrying
+        'ignoreerrors': True,
     }
 
     while True:
@@ -224,37 +233,26 @@ def download_videos(remaining_downloads_filename, video_folder_name, download_ty
                 print("All downloads completed!")
                 break
 
-            first_url = urls[0]
-            if first_url.endswith("*****"):
-                first_url = first_url.replace("*****", "")
-                print(f"Downloading: {str(first_url)}")
-                with yt_dlp.YoutubeDL(ydl_options) as ydl:
-                    try:
-                        ydl.download([first_url])
+            current_url = urls[0]
+            # Download condition
+            if allow_all or current_url.endswith("*****"):
+                clean_url = current_url.replace("*****", "")  # Cleaning up the extraspacing
+                print(f"Downloading: {clean_url}")
+                try:
+                    with yt_dlp.YoutubeDL(ydl_options) as ydl:
+                        ydl.download([clean_url])
+                except Exception as e:
+                    print(f"Failed to download {clean_url}: {str(e)}")
 
-                    except yt_dlp.utils.DownloadError as e:
-                        print(f"Skipping invalid or dead link: {first_url} - Error: {e}")
-                        urls.pop(0)
-                        with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
-                            json.dump(urls, f, indent=4)
-                        continue
-    
-                    except yt_dlp.utils.ExtractorError as e:
-                        #In case you get rate limited. I did. It automatically goes through all downloads in this case and removes the urls unfairly.
-                        if "HTTP Error 403: Forbidden" in str(e):
-                            print(f"Error: {e}")
-                            print("There is a rate limit or some other access restriction (403 Forbidden).")
-                            if input("Do you want to stop and resume later? \nYour progress so far has been stored in the remaining_downloads.json (y/n): ").strip().lower().startswith("y"):
-                                with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
-                                    json.dump(urls, f, indent=4)
-                                print("Progress saved. You can resume the download later.")
-                                return  # Exit the function and resume later
+                # Remove URL whether successful or not
+                urls.pop(0)
+                with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
+                    json.dump(urls, f, indent=4)
             else:
-                print(f"Skipping url {first_url}! (Not in danger)")
-
-            urls.pop(0)
-            with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
-                json.dump(urls, f, indent=4)
+                print(f"Skipping {clean_url} (not marked as at-risk)")
+                urls.pop(0)
+                with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
+                    json.dump(urls, f, indent=4)
 
         except FileNotFoundError:
             print("No remaining downloads file found")
@@ -262,11 +260,14 @@ def download_videos(remaining_downloads_filename, video_folder_name, download_ty
         except json.JSONDecodeError:
             print("Error reading JSON file")
             break
-        except yt_dlp.utils.DownloadError as e:
-            print(f"Failed to download {first_url}: {e}")
+        except KeyboardInterrupt:
+            print("\nDownload interrupted by user. Progress saved.")
+            with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
+                json.dump(urls, f, indent=4)
             break
         except Exception as e:
             print(f"Unexpected error: {e}")
+            break
 
 def load_remaining_downloads(remaining_downloads_filename):
     try:
