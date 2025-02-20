@@ -6,33 +6,22 @@ from isodate import parse_duration
 import yt_dlp
 import json
 from datetime import datetime
+import srcomapi
 
 # Configuration
 BASE_URL = "https://www.speedrun.com/api/v1"
 RATE_LIMIT = 0.6  # 600ms between requests because rate limits. Something I learned today
 DEBUG_FILE = "debug_log.txt"
-HIGHLIGHTS_FILE = "twitch_highlights.txt"
-HIGHLIGHTS_JSON = "twitch_highlights.json"
-DOWNLOADS_REMAINING_FILE = "downloads_remaining.json"
+HIGHLIGHTS_FILE = "twitch_highlights_mmbn5.txt"
+HIGHLIGHTS_JSON = "twitch_highlights_mmbn5.json"
+DOWNLOADS_REMAINING_FILE = "downloads_remaining_mmbn5.json"
 timestamp = time.time()
 jsonData ={}
-
-def req(url):
-    global timestamp
-    exec_time = time.time() - timestamp
-    if exec_time < RATE_LIMIT:
-        time.sleep(RATE_LIMIT - exec_time)
-
-    response = requests.get(url)
-    data = response.json()
-
-    timestamp = time.time()
-    return data
 
 def get_user_id(username):
     #getting the userid first from their username
     try:
-        data = req(f"{BASE_URL}/users/{quote(username)}")
+        data = srcomapi.get(f"/users/{quote(username)}")
         return data['data']['id']
     except KeyError:
         print("Invalid username or API error")
@@ -42,7 +31,7 @@ def get_user_id(username):
         return None
 
 def get_game_id(game):
-    data = req(f"{BASE_URL}/games?abbreviation={game}&max=1&_bulk=yes")
+    data = srcomapi.get(f"/games?abbreviation={game}&max=1&_bulk=yes")
 
     game_id = data["data"][0]["id"]
     return game_id
@@ -53,9 +42,9 @@ def get_all_runs(user_id):
     offset = 0
 
     while True:
-        url = f"{BASE_URL}/runs?user={user_id}&max=200&offset={offset}&status=verified&embed=game,category,players"
+        url = f"/runs?user={user_id}&max=200&offset={offset}&status=verified&embed=game,category,players"
         try:
-            data = req(url)
+            data = srcomapi.get(url)
             runs.extend(data['data'])
             # Pagination check
             if data['pagination']['size'] < 200:
@@ -71,10 +60,10 @@ def get_all_runs_from_game(game_id):
     offset = 0
 
     while True:
-        url = f"{BASE_URL}/runs?game={game_id}&max=200&offset={offset}&status=verified&embed=game,category,players"
+        url = f"/runs?game={game_id}&max=200&offset={offset}&status=verified&embed=game,category,players"
         try:
             print(f"offset: {offset}")
-            data = req(url)
+            data = srcomapi.get(url)
             runs.extend(data['data'])
 
             # Pagination check
@@ -87,7 +76,7 @@ def get_all_runs_from_game(game_id):
 
     return runs
 
-twitch_url_regex = re.compile(r"https?:\/\/(?:www\.)?twitch\.tv\/\S*", re.IGNORECASE)
+twitch_url_regex = re.compile(r"(https?:\/\/)?(?:www\.)?twitch\.tv\/\S*", re.IGNORECASE)
 def is_twitch_url(url):
     # Checking with regex if its a twitch highlight
     return twitch_url_regex.search(url)

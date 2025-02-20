@@ -174,3 +174,4 @@ cython_debug/
 virt/
 remaining_downloads.json
 twitch_highlights.json
+srcom_cached/
