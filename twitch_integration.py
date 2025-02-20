@@ -183,20 +183,22 @@ class UserCache:
             json.dump(self.cache_info, f, indent=2)
 
 class TwitchClient:
-    __slots__ = ("config", "twitch", "user_cache")
+    __slots__ = ("twitch", "user_cache")
 
-    def __init__(self, config, twitch):
-        self.config = config
+    def __init__(self, args, twitch):
         self.twitch = twitch
-        self.user_cache = UserCache(self.config["cache_filename"])
+        self.user_cache = UserCache(args.cache_filename)
 
     @classmethod
-    async def init(cls, config):
-        app_id = config["app_id"]
-        app_secret = config["app_secret"]
-        twitch = await Twitch(app_id, app_secret)
+    async def init(cls, args):
+        app_id = args.app_id
+        app_secret = args.app_secret
+        if app_id is None or app_secret is None:
+            twitch = None
+        else:
+            twitch = await Twitch(app_id, app_secret)
 
-        return cls(config, twitch)
+        return cls(args, twitch)
 
     async def fetch_info(self, video_urls):
         await self.user_cache.update_video_infos_from_video_urls(self.twitch, video_urls)
