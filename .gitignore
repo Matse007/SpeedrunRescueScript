@@ -175,3 +175,6 @@ virt/
 remaining_downloads.json
 twitch_highlights.json
 srcom_cached/
+output/
+twitch_cache.json
+config.json

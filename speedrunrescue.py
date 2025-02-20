@@ -7,6 +7,9 @@ import yt_dlp
 import json
 from datetime import datetime
 import srcomapi
+import twitch_integration
+import asyncio
+import pathlib
 
 # Configuration
 BASE_URL = "https://www.speedrun.com/api/v1"
@@ -89,9 +92,10 @@ def filter_live(info):
     # Otherwise, return None to allow the video.
     return None
 
-def process_runs(runs):
+async def process_runs(runs, client):
     #Extract Twitch highlight urls from runs
     highlights = []
+    all_twitch_urls = []
     for run in runs:
         videos = run.get('videos') or {}
         links = videos.get('links') or []
@@ -132,10 +136,14 @@ def process_runs(runs):
                 'comment': run.get('comment', '')
             }
 
+            all_twitch_urls.extend(twitch_urls)
             if len(player_twitch_yt_urls) != 0:
                 highlight["vod_sites"] = player_twitch_yt_urls
 
             highlights.append(highlight)
+
+    await client.fetch_info(all_twitch_urls)
+    client.write_twitch_users_at_risk()
 
     return highlights
 
@@ -146,9 +154,22 @@ def format_date_of_submission(dateobj):
         formatted_date = "Unknown date"
     return formatted_date
 
-def save_highlights(highlights):
+def save_highlights(highlights, client, highlights_filename, remaining_downloads_filename, highlights_json_filename):
     #saving all highlights in a formatted way for the user i guess? My hope is I can automate uploads later
-    with open(HIGHLIGHTS_FILE, "w", encoding="utf-8") as f:
+    
+    for highlight in highlights:
+        new_twitch_urls = []
+        at_risk = False
+        for twitch_url in highlight["urls"]:
+            if client.is_video_at_risk(twitch_url):
+                at_risk = True
+                new_twitch_urls.append(f"{twitch_url}*****")
+            else:
+                new_twitch_urls.append(twitch_url)
+        highlight["urls"] = new_twitch_urls
+        highlight["at_risk"] = at_risk
+    
+    with open(highlights_filename, "w", encoding="utf-8") as f:
         for entry in highlights:
             #formatting the iso format
 
@@ -159,6 +180,7 @@ def save_highlights(highlights):
             f.write(f"Run Date: {format_date_of_submission(entry['date'])}\n")
             f.write(f"URL: {' '.join(entry['urls'])}\n")
             f.write(f"Run ID: {entry['run_id']}\n")
+            f.write(f"Channel exceeds 100h limit: {entry['at_risk']}\n")
             f.write(f"Comment: {entry['comment']}\n")
             vod_sites = entry.get("vod_sites")
             if vod_sites is not None:
@@ -167,13 +189,12 @@ def save_highlights(highlights):
             f.write("-" * 50 + "\n")
 
     urls = [url for entry in highlights for url in entry["urls"]]
-    with open("remaining_downloads.json", "w", encoding="utf-8") as f:
+    with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
         json.dump(urls, f, indent=4)
-    with open(HIGHLIGHTS_JSON, "w", encoding="utf-8") as f:
+    with open(highlights_json_filename, "w", encoding="utf-8") as f:
         json.dump(highlights, f, indent=4)
 
-
-def download_videos():
+def download_videos(remaining_downloads_filename):
     #downloading videos out of the provided dict using the yt-dlp module.
     ydl_options = {
         'format': 'bestvideo+bestaudio/best',
@@ -188,7 +209,7 @@ def download_videos():
     while True:
         try:
             # Load URLs from JSON file
-            with open("remaining_downloads.json", "r", encoding="utf-8") as f:
+            with open(remaining_downloads_filename, "r", encoding="utf-8") as f:
                 urls = json.load(f)
 
             # Stop if no URLs are left
@@ -205,7 +226,7 @@ def download_videos():
                 except yt_dlp.utils.DownloadError as e:
                     print(f"Skipping invalid or dead link: {first_url} - Error: {e}")
                     urls.pop(0)
-                    with open("remaining_downloads.json", "w", encoding="utf-8") as f:
+                    with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
                         json.dump(urls, f, indent=4)
                     continue
 
@@ -215,13 +236,13 @@ def download_videos():
                         print(f"Error: {e}")
                         print("There is a rate limit or some other access restriction (403 Forbidden).")
                         if input("Do you want to stop and resume later? \nYour progress so far has been stored in the remaining_downloads.json (y/n): ").strip().lower().startswith("y"):
-                            with open("remaining_downloads.json", "w", encoding="utf-8") as f:
+                            with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
                                 json.dump(urls, f, indent=4)
                             print("Progress saved. You can resume the download later.")
                             return  # Exit the function and resume later
 
                 urls.pop(0)
-                with open("remaining_downloads.json", "w", encoding="utf-8") as f:
+                with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
                     json.dump(urls, f, indent=4)
 
         except FileNotFoundError:
@@ -236,9 +257,9 @@ def download_videos():
         except Exception as e:
             print(f"Unexpected error: {e}")
 
-def load_remaining_downloads():
+def load_remaining_downloads(remaining_downloads_filename):
     try:
-        with open("remaining_downloads.json", "r", encoding="utf-8") as f:
+        with open(remaining_downloads_filename, "r", encoding="utf-8") as f:
             urls = json.load(f)
         if not urls:
             print("No remaining downloads file found")
@@ -251,23 +272,41 @@ def load_remaining_downloads():
     except Exception as e:
         print(f"Unexpected error: {e}")
 
-def main():
+async def main():
+    pathlib.Path("output").mkdir(exist_ok=True)
+    with open("config.json", "r") as f:
+        config = json.load(f)
+
+    game = config["game"]
+    if game:
+        download_type_str = "game"
+        game_or_username = game
+        is_game = True
+    else:
+        username = config["username"]
+        if not username:
+            raise RuntimeError("Neither username nor game specified!")
+
+        download_type_str = "user"
+        game_or_username = username
+        is_game = False
+
+    highlights_filename = f"output/twitch_highlights.{download_type_str}.{game_or_username}.txt"
+    highlights_json_filename = f"output/twitch_highlights.{download_type_str}.{game_or_username}.json"
+    remaining_downloads_filename = f"output/remaining_downloads.{download_type_str}.{game_or_username}.json"
+
     #Check if there are remaining Downloads left.
-    remaininDownloads = load_remaining_downloads()
+    remaininDownloads = load_remaining_downloads(remaining_downloads_filename)
     if remaininDownloads and input("A remaining downloads file has been found. Do you want to continue the download? (y/n): ").lower().startswith("y"):
-        download_videos()
+        download_videos(config["remaining_downloads_file"])
         return
 
-    if input("Do you want to backup a game? If no, this will default to users (y/n): ").lower().startswith("y"):
-        print("Enter Speedrun.com Game abbreviation.")
-        print("An example, (here in brackets) would be: speedrun.com/[sm64]. The abbreviation would be sm64")
-        game = input("Enter Speedrun.com Game abbreviation: ").strip()
+    if is_game:
         print(f"Searching for {game}...")
         game_id = get_game_id(game)
         print(f"Getting all runs")
         runs = get_all_runs_from_game(game_id)
     else:
-        username = input("Enter Speedrun.com username: ").strip()
         print(f"Searching for {username}...")
         # Getting the user id first from the username.
         user_id = get_user_id(username)
@@ -278,21 +317,23 @@ def main():
         # Fetch all runs from user
         print("Fetching runs...")
         runs = get_all_runs(user_id)
-        print(f"Found {len(runs)} verified runs")
 
+    print(f"Found {len(runs)} verified runs")
+
+    client = await twitch_integration.TwitchClient.init(config)
     # Checking for highlights
-    highlights = process_runs(runs)
+    highlights = await process_runs(runs, client)
     print(f"Found {len(highlights)} Twitch highlights")
 
     # Save highlights
-    save_highlights(highlights)
-    print(f"Saved highlights to {HIGHLIGHTS_FILE}")
+    save_highlights(highlights, client, highlights_filename, remaining_downloads_filename, highlights_json_filename)
+    print(f"Saved highlights to {highlights_filename}")
 
     # Download prompt for users and downloading videos
     if highlights and input("Download videos? (y/n): ").lower().startswith("y"):
-        download_videos()
+        download_videos(remaining_downloads_filename)
         print("Download completed")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
