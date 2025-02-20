@@ -16,7 +16,7 @@ Before running the script you need to have the following tools installed:
 ```pyton
 pip install -r requirements.txt
 ```
-4. Makesure to have ffmpeg installed. This script is using yt-dlp which absolutely requires ffmpeg. Look for an installation guide for installing ffmpeg. You can download it here on [their official website](https://ffmpeg.org/download.htmltheir)
+4. Makesure to have ffmpeg installed. This script is using yt-dlp which absolutely requires ffmpeg. Look for an installation guide for installing ffmpeg. You can download it here on [their official website](https://ffmpeg.org/download.html)
 
 ## How to use this
 1. Run the script. Again you need to have a command line open in your local folder as explained above and then by typing this command:
