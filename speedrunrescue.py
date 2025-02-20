@@ -4,13 +4,16 @@ import requests
 from urllib.parse import quote
 from isodate import parse_duration
 import yt_dlp
+import json
 
 # Configuration
 BASE_URL = "https://www.speedrun.com/api/v1"
 RATE_LIMIT = 0.6  # 600ms between requests because rate limits. Something I learned today
 DEBUG_FILE = "debug_log.txt"
 HIGHLIGHTS_FILE = "twitch_highlights.txt"
+DOWNLOADS_REMAINING_FILE = "downloads_remaining.json"
 timestamp = time.time()
+jsonData ={}
 
 def req(url):
     global timestamp
@@ -23,7 +26,6 @@ def req(url):
 
     timestamp = time.time()
     return data
-
 
 def get_user_id(username):
     #getting the userid first from their username
@@ -97,26 +99,72 @@ def save_highlights(highlights):
             f.write(f"URL: {entry['url']}\n")
             f.write(f"Run ID: {entry['run_id']}\n")
             f.write("-" * 50 + "\n")
+    with open("remaining_downloads.json", "w", encoding="utf-8") as f:
+        json.dump([entry['url'] for entry in highlights], f, indent=4)
 
 
-def download_videos(highlights):
+def download_videos():
     #downloading videos out of the provided dict using the yt-dlp module.
     ydl_options = {
         'format': 'bestvideo+bestaudio/best',
-        'outtmpl': '%(title)s.%(ext)s',
+        'outtmpl': 'videos/%(title)s.%(ext)s',
         'noplaylist': True,
+
     }
-    with yt_dlp.YoutubeDL(ydl_options) as ydl:
-        for idx, entry in enumerate(highlights, 1):
-            print(f"Downloading {idx}/{len(highlights)}: {entry['url']}")
-            try:
-                ydl.download([entry['url']])
-            except yt_dlp.utils.DownloadError as e:
-                print(f"Failed to download {entry['url']}: {e}")
+    while True:
+        try:
+            # Load URLs from JSON file
+            with open("remaining_downloads.json", "r", encoding="utf-8") as f:
+                urls = json.load(f)
 
+            # Stop if no URLs are left
+            if not urls:
+                print("All downloads completed!")
+                break
 
+            first_url = urls[0]
+            print(f"Downloading: {first_url}")
+            with yt_dlp.YoutubeDL(ydl_options) as ydl:
+                ydl.download([first_url])
+            urls.pop(0)
+            with open("remaining_downloads.json", "w", encoding="utf-8") as f:
+                json.dump(urls, f, indent=4)
+
+        except FileNotFoundError:
+            print("No remaining downloads file found")
+            break
+        except json.JSONDecodeError:
+            print("Error reading JSON file")
+            break
+        except yt_dlp.utils.DownloadError as e:
+            print(f"Failed to download {first_url}: {e}")
+            break
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            break
+
+def load_remaining_downloads():
+    try:
+        with open("remaining_downloads.json", "r", encoding="utf-8") as f:
+            urls = json.load(f)
+        if not urls:
+            print("No remaining downloads file found")
+            return None
+        return urls
+    except FileNotFoundError:
+        print("No remaining downloads file found")
+    except json.JSONDecodeError:
+        print("Error reading JSON file")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
 
 def main():
+    #Check if there are remaining Downloads left.
+    remaininDownloads = load_remaining_downloads()
+    if remaininDownloads and input("A remaining downloads file has been found. Do you want to continue the download? (y/n): ").lower().startswith("y"):
+        download_videos()
+        return
+
     username = input("Enter Speedrun.com username: ").strip()
     print(f"Searching for {username}...")
 
@@ -141,7 +189,7 @@ def main():
 
     # Download prompt for users and downloading videos
     if highlights and input("Download videos? (y/n): ").lower().startswith("y"):
-        download_videos(highlights)
+        download_videos()
         print("Download completed")
 
 
