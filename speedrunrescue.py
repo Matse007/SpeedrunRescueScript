@@ -4,6 +4,7 @@ import requests
 from urllib.parse import quote
 from isodate import parse_duration
 import yt_dlp
+import yt_dlp.postprocessor
 import json
 from datetime import datetime
 import srcomapi
@@ -107,30 +108,6 @@ def filter_live(info):
         return "Skipping live stream"
     # Otherwise, return None to allow the video.
     return None
-
-def build_custom_fallback_format_string(target_quality, quality_options=[160, 360, 480, 720, 1080]):
-    #keeping this flexible so users are forgiven if they dont type the actually proper resolution
-    if target_quality not in quality_options:
-        quality_options.append(target_quality)
-
-    quality_options.sort()
-    target_index = quality_options.index(target_quality)
-    fallback_order = [quality_options[target_index]]
-    #There is probably a prettier version of this out there, but I dont know enough python to shorten this more rn.
-    up = target_index + 1
-    down = target_index - 1
-    # Alternate between higher and lower qualities in the list, adding those in respective order. I hope I didnt mess this up
-    while up < len(quality_options) or down >= 0:
-        if up < len(quality_options):
-            fallback_order.append(quality_options[up])
-            up += 1
-        if down >= 0:
-            fallback_order.append(quality_options[down])
-            down -= 1
-    format_string = " / ".join(f"bestvideo[height={q}]+bestaudio" for q in fallback_order)
-    format_string += " / best"  # adding fallback to best possible resolution (if everything fails and they have some weird resolution)
-
-    return format_string
 
 async def process_runs(runs, client, ignore_links_in_description):
     #Extract Twitch highlight urls from runs
@@ -275,7 +252,119 @@ Traceback (most recent call last)
 
     print(output)
 
-def download_videos(remaining_downloads_filename, video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, allow_all, chosen_format):
+class DesiredQuality:
+    __slots__ = ("download_best", "desired_height", "fallback_should_increase_quality")
+
+    def __init__(self, download_best, desired_height, fallback_should_increase_quality):
+        self.download_best = download_best
+        self.desired_height = desired_height
+        self.fallback_should_increase_quality = fallback_should_increase_quality
+
+    @classmethod
+    def from_string(cls, input_str):
+        input_str = input_str.strip()
+        if input_str == "best":
+            return cls(True, 0, False)
+
+        if input_str.startswith("<="):
+            fallback_should_increase_quality = False
+            input_str = input_str[2:]
+        elif input_str.startswith(">="):
+            fallback_should_increase_quality = True
+            input_str = input_str[2:]
+        else:
+            fallback_should_increase_quality = True
+
+        if input_str[-1] == "p":
+            input_str = input_str[:-1]
+
+        try:
+            desired_height = int(input_str)
+        except ValueError:
+            raise RuntimeError(f"Invalid format for `video-quality` (got: {input_str}). Please specify the video quality or desired height of the video, e.g. 360p, 720, 1080, 542. You can also add >= or <= before the quality to tell the program whether to download the closest higher quality or closest lower quality, respectively, if the quality does not exist. If you omit >= and <=, it defaults to choosing the closest higher quality.")
+
+        return cls(False, desired_height, fallback_should_increase_quality)
+
+class QualityPostprocessor(yt_dlp.postprocessor.PostProcessor):
+    __slots__ = ("desired_height", "fallback_should_increase_quality")
+
+    def __init__(self, desired_quality):
+        super(QualityPostprocessor, self).__init__(None)
+        self.desired_height = desired_quality.desired_height
+        self.fallback_should_increase_quality = desired_quality.fallback_should_increase_quality
+
+    @staticmethod
+    def is_format_source(quality_format):
+        # No hard and fast rule, so test multiple things
+        if "source" in quality_format["format_id"].lower() or "source" in quality_format.get("format_note", "").lower() or "source" in quality_format.get("format", "").lower():
+            return True
+        else:
+            return False
+
+    def run(self, info):
+        best_height = 0
+        best_tbr = 0
+        best_format_id = None
+        source_format = None
+        source_format_id = None
+
+        formats_sorted_by_height = sorted(info["formats"], key=lambda x: x.get("height", 0))
+        #with open("quality_postprocessor_test.json", "w+") as f:
+        #    json.dump(info, f, indent=2)
+        #print(f"formats_sorted_by_height: {formats_sorted_by_height}")
+        for quality_format in formats_sorted_by_height:
+            if quality_format["vcodec"] == "none":
+                #print(f"Continued {quality_format}")
+                continue
+
+            format_id = quality_format["format_id"]
+            height = quality_format["height"]
+            tbr = quality_format["tbr"]
+            is_source = QualityPostprocessor.is_format_source(quality_format)
+
+            if is_source:
+                source_format = quality_format
+
+            #print(f"best_height: {best_height}, height: {height}, self.desired_height: {self.desired_height}, is_source: {is_source}, quality_format: {quality_format}\n\n\n")
+
+            if best_height == 0 or height < self.desired_height:
+                best_height = height
+                best_tbr = tbr
+                best_format_id = format_id
+            # edge case for when there are multiple formats with the same height and we have to choose between them
+            elif height == self.desired_height:
+                # if the best height isn't even the desired height yet, then set it so
+                # otherwise, it is, and we need to choose out of the two which to pick
+                # I think this only happens when one is source quality
+
+                if best_height != self.desired_height or is_source:
+                    best_height = height
+                    best_tbr = tbr
+                    best_format_id = format_id
+            # only do this logic if we want to fallback to a higher quality
+            # if the height we chose doesn't match the desired height
+            elif self.fallback_should_increase_quality:
+                # if the current best height is less than the desired height, and we want to fallback to quality higher
+                # edge case to pick the source quality when we meet qualities with the same height
+                if best_height < self.desired_height or (best_height == height and is_source):
+                    best_height = height
+                    best_tbr = tbr
+                    best_format_id = format_id
+
+        # Sometimes, the source format size can be less than encoded formats at a lower resolution
+        # if this is true for the best format we picked, then choose the source format
+        if source_format is not None and source_format["tbr"] < best_tbr:
+            best_format_id = source_format["format_id"]
+
+        # include audio format just in case somehow, the best video format has no audio
+        new_formats = [quality_format for quality_format in info["formats"] if quality_format["format_id"] == best_format_id or (quality_format["acodec"] != "none" and quality_format["vcodec"] == "none")]
+
+        info["formats"] = new_formats
+        #print(f"Post processor info: {info}")
+
+        return [], info
+
+def download_videos(remaining_downloads_filename, video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, allow_all, desired_quality):
     #pathlib.Path(download_folder_name).mkdir(parents=True, exist_ok=True)
     #downloading videos out of the provided dict using the yt-dlp module.
 
@@ -293,8 +382,8 @@ Description:
     print_to_file_list = [[download_info_template, downloaded_video_info_filename]]
 
     ydl_options = {
-        'format': chosen_format,
-        'outtmpl': f'{video_folder_name}/{download_type_str}/{game_or_username}/%(title)s_%(id)s.%(ext)s',
+        'format': "bestvideo+bestaudio/best",
+        'outtmpl': f'{video_folder_name}/{download_type_str}/{game_or_username}/%(title)s_%(id)s_%(format_id)s.%(ext)s',
         'noplaylist': True,
         'match_filter': filter_live, #uses a function to determine if the dead link now links to a stream and accidentially starts to download this instead. Hopefully should skip livestreams
         "print_to_file": {"after_video": print_to_file_list},
@@ -303,6 +392,11 @@ Description:
         'retries': 1,  # Retry a second time a bit later in case there was simply an issue
         'retry-delay': 10,  # Wait 10 seconds before retrying
     }
+
+    if desired_quality.download_best:
+        quality_postprocessor = None
+    else:
+        quality_postprocessor = QualityPostprocessor(desired_quality)
 
     while True:
         try:
@@ -328,6 +422,9 @@ Description:
                 print(f"Downloading: {clean_url}")
                 print_to_file_list[0][0] = download_info_template.format(src_url=src_link)
                 with yt_dlp.YoutubeDL(ydl_options) as ydl:
+                    if quality_postprocessor is not None:
+                        ydl.add_post_processor(quality_postprocessor, when="pre_process")
+
                     try:
                         ydl.download([clean_url])
                     except Exception as e:
@@ -345,7 +442,7 @@ Description:
                             with open(downloaded_video_info_filename, "a+") as f:
                                 f.write(f"Failed to download {clean_url}: {error_msg}\n==========================================================\n")
             else:
-                print(f"Skipping {clean_url} (not marked as at-risk)")
+                print(f"Skipping {current_url} (not marked as at-risk)")
                 sleep_time = 0
 
             urls.pop(0)
@@ -412,24 +509,13 @@ async def main():
     ap.add_argument("--cache-filename", dest="cache_filename", default="twitch_cache.json", help="File containing information about users' videos from the Twitch API (for determining if a user has >= 100 hours of highlights). Default is twitch_cache.json")
     ap.add_argument("--download-videos", dest="download_videos", type=convert_bool, help="Whether to download videos after scraping them from speedrun.com", required=True)
     ap.add_argument("--allow-all", dest="allow_all", type=convert_bool, help="Whether to download all found videos regardless of whether or not the channel they exist on have reached the >=100h highlight limit.", required=True)
-    ap.add_argument("--video-quality", dest="video_quality", default="best", help="Desired max video resolution (e.g. 360, 480, 720, 1080) or 'best' for no limit")
-    ap.add_argument("--ignore-links-in-description", dest="ignore_links_in_description", type=convert_bool, help="Whether to ignore twitch links that are in the video description or now. By default this is disabled.", required=True)
+    ap.add_argument("--video-quality", dest="video_quality", default="best", help="Desired closest video quality that you want to download. For this option, specify the video quality or desired height of the video, e.g. 360p, 720, 1080, 542. Choosing \"best\" will just download the best quality available. THIS OPTION SHOULD BE IN QUOTES, i.e. do \"360p\", not 360p. You can also add >= or <= before the quality to tell the program whether to download the closest higher quality or closest lower quality, respectively, if the quality does not exist. If you omit >= and <=, it defaults to choosing the closest higher quality. Defaults to \"best\".")
+    ap.add_argument("--ignore-links-in-description", dest="ignore_links_in_description", type=convert_bool, help="Whether to ignore twitch links that are in the video description or not. By default this is disabled.", required=True)
     args = ap.parse_args()
 
-    chosen_format = ""
-    if args.video_quality.lower() == "best":
-        chosen_format = "bestvideo+bestaudio/best"
-    else:
-        try:
-            target_quality = int(args.video_quality)
-            chosen_format = build_custom_fallback_format_string(target_quality)
-        except ValueError:
-            #In hindsight, isnt needed anymore as I am no longer checking for invalid configurations. The function should also avoid these issues at all.
-            #probably safe to delete, thats a future problem for me
-            print("Invalid video_quality configuration; defaulting to best quality.")
-            chosen_format = "bestvideo+bestaudio/best"
+    desired_quality = DesiredQuality.from_string(args.video_quality)
 
-    print(f"Using format: {chosen_format}")
+    print(f"Using quality: {args.video_quality}")
 
     if args.game and args.username:
         raise RuntimeError("Only one of `username:` or `game:` must be specified in config.yml!")
@@ -459,7 +545,7 @@ async def main():
     #Check if there are remaining Downloads left.
     remaininDownloads = load_remaining_downloads(remaining_downloads_filename)
     if remaininDownloads and input("A remaining downloads file has been found. Do you want to continue the download? (y/n): ").lower().startswith("y"):
-        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all,chosen_format)
+        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all, desired_quality)
         return
 
     if is_game:
@@ -494,7 +580,7 @@ async def main():
 
     # Download prompt for users and downloading videos
     if highlights and args.download_videos:
-        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all, chosen_format)
+        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all, desired_quality)
         print("Download completed")
 
 if __name__ == "__main__":

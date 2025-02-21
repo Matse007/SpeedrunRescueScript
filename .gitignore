@@ -182,3 +182,4 @@ config.yml
 release_working/
 !release_info/config.yml
 build_options.yml
+videos/
