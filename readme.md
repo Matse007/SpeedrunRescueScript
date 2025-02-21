@@ -88,6 +88,8 @@ app-id: e3udyluhnly6q6g2qp5a00nwaz73dj
 app-secret: n8p6t5qy6f33lnm3v8jjgwliqazps0
 download-videos: false
 allow-all: false
+#specify the desired videoquality ranges from 160 - 1080. Can be left empty, it will default to the best quality.
+video-quality: 360
 ```
 
 ## Additional filtering
