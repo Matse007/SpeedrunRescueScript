@@ -3,8 +3,8 @@ game: ""
 username: ""
 
 # Not necessary if you're downloading from a username
-app-id: <your app id>
-app-secret: <your app secret>
+#app-id: <your app id>
+#app-secret: <your app secret>
 
 # Where to store the videos
 video-folder-name: videos
