@@ -255,7 +255,6 @@ def save_highlights(highlights, client, is_game, highlights_filename, remaining_
     with open(highlights_json_filename, "w", encoding="utf-8") as f:
         json.dump(highlights, f, indent=4)
 
-video_does_not_exist_regex = re.compile(r"Video \w+ does not exist", flags=re.IGNORECASE)
 
 def print_exception(e, additional_msg=""):
     error_msg = e.args[0] if len(e.args) >= 1 else "(Not provided)"
@@ -333,7 +332,8 @@ Description:
                     except Exception as e:
                         error_msg = e.args[0] if len(e.args) >= 1 else ""
                         # Video does not exist
-                        if video_does_not_exist_regex.search(error_msg) or "The channel is not currently live" in error_msg:
+                        # video_does_not_exist_regex = re.compile(r"Video \w+ does not exist", flags=re.IGNORECASE) <-- seemed not to work. as a quick fix i disabled it and check manually
+                        if ("does not exist" in error_msg) or ("The channel is not currently live" in error_msg):
                             print(f"Skipping invalid or dead link: {clean_url}")
                             with open(downloaded_video_info_filename, "a+") as f:
                                 f.write(f"{clean_url} for {src_link} does not exist\n==========================================================\n")
