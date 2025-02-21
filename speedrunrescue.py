@@ -108,7 +108,31 @@ def filter_live(info):
     # Otherwise, return None to allow the video.
     return None
 
-async def process_runs(runs, client):
+def build_custom_fallback_format_string(target_quality, quality_options=[160, 360, 480, 720, 1080]):
+    #keeping this flexible so users are forgiven if they dont type the actually proper resolution
+    if target_quality not in quality_options:
+        quality_options.append(target_quality)
+
+    quality_options.sort()
+    target_index = quality_options.index(target_quality)
+    fallback_order = [quality_options[target_index]]
+    #There is probably a prettier version of this out there, but I dont know enough python to shorten this more rn.
+    up = target_index + 1
+    down = target_index - 1
+    # Alternate between higher and lower qualities in the list, adding those in respective order. I hope I didnt mess this up
+    while up < len(quality_options) or down >= 0:
+        if up < len(quality_options):
+            fallback_order.append(quality_options[up])
+            up += 1
+        if down >= 0:
+            fallback_order.append(quality_options[down])
+            down -= 1
+    format_string = " / ".join(f"bestvideo[height={q}]+bestaudio" for q in fallback_order)
+    format_string += " / best"  # adding fallback to best possible resolution (if everything fails and they have some weird resolution)
+
+    return format_string
+
+async def process_runs(runs, client, ignore_links_in_description):
     #Extract Twitch highlight urls from runs
     highlights = []
     all_twitch_urls = []
@@ -116,6 +140,8 @@ async def process_runs(runs, client):
         videos = run.get('videos') or {}
         links = videos.get('links') or []
         twitch_urls = []
+        if ignore_links_in_description and links:
+            links = [links[-1]]
         for video in links:
             uri = video.get('uri', '')
             result = is_twitch_video_url(uri)
@@ -188,7 +214,7 @@ def save_highlights(highlights, client, is_game, highlights_filename, remaining_
             else:
                 at_risk = client.is_video_at_risk(twitch_url)
 
-            if at_risk:                
+            if at_risk:
                 new_twitch_urls.append(f"{twitch_url}*****")
             else:
                 new_twitch_urls.append(twitch_url)
@@ -229,7 +255,6 @@ def save_highlights(highlights, client, is_game, highlights_filename, remaining_
     with open(highlights_json_filename, "w", encoding="utf-8") as f:
         json.dump(highlights, f, indent=4)
 
-video_does_not_exist_regex = re.compile(r"Video \w+ does not exist", flags=re.IGNORECASE)
 
 def print_exception(e, additional_msg=""):
     error_msg = e.args[0] if len(e.args) >= 1 else "(Not provided)"
@@ -250,10 +275,10 @@ Traceback (most recent call last)
 
     print(output)
 
-def download_videos(remaining_downloads_filename, video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, allow_all):
+def download_videos(remaining_downloads_filename, video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, allow_all, chosen_format):
     #pathlib.Path(download_folder_name).mkdir(parents=True, exist_ok=True)
     #downloading videos out of the provided dict using the yt-dlp module.
-    
+
     download_info_template = """\
 URL: %(original_url)s
 speedrun.com URL: {src_url}
@@ -268,7 +293,7 @@ Description:
     print_to_file_list = [[download_info_template, downloaded_video_info_filename]]
 
     ydl_options = {
-        'format': 'bestvideo+bestaudio/best',
+        'format': chosen_format,
         'outtmpl': f'{video_folder_name}/{download_type_str}/{game_or_username}/%(title)s_%(id)s.%(ext)s',
         'noplaylist': True,
         'match_filter': filter_live, #uses a function to determine if the dead link now links to a stream and accidentially starts to download this instead. Hopefully should skip livestreams
@@ -308,7 +333,8 @@ Description:
                     except Exception as e:
                         error_msg = e.args[0] if len(e.args) >= 1 else ""
                         # Video does not exist
-                        if video_does_not_exist_regex.search(error_msg):
+                        # video_does_not_exist_regex = re.compile(r"Video \w+ does not exist", flags=re.IGNORECASE) <-- seemed not to work. as a quick fix i disabled it and check manually
+                        if ("does not exist" in error_msg) or ("The channel is not currently live" in error_msg):
                             print(f"Skipping invalid or dead link: {clean_url}")
                             with open(downloaded_video_info_filename, "a+") as f:
                                 f.write(f"{clean_url} for {src_link} does not exist\n==========================================================\n")
@@ -386,8 +412,24 @@ async def main():
     ap.add_argument("--cache-filename", dest="cache_filename", default="twitch_cache.json", help="File containing information about users' videos from the Twitch API (for determining if a user has >= 100 hours of highlights). Default is twitch_cache.json")
     ap.add_argument("--download-videos", dest="download_videos", type=convert_bool, help="Whether to download videos after scraping them from speedrun.com", required=True)
     ap.add_argument("--allow-all", dest="allow_all", type=convert_bool, help="Whether to download all found videos regardless of whether or not the channel they exist on have reached the >=100h highlight limit.", required=True)
-
+    ap.add_argument("--video-quality", dest="video_quality", default="best", help="Desired max video resolution (e.g. 360, 480, 720, 1080) or 'best' for no limit")
+    ap.add_argument("--ignore-links-in-description", dest="ignore_links_in_description", type=convert_bool, help="Whether to ignore twitch links that are in the video description or now. By default this is disabled.", required=True)
     args = ap.parse_args()
+
+    chosen_format = ""
+    if args.video_quality.lower() == "best":
+        chosen_format = "bestvideo+bestaudio/best"
+    else:
+        try:
+            target_quality = int(args.video_quality)
+            chosen_format = build_custom_fallback_format_string(target_quality)
+        except ValueError:
+            #In hindsight, isnt needed anymore as I am no longer checking for invalid configurations. The function should also avoid these issues at all.
+            #probably safe to delete, thats a future problem for me
+            print("Invalid video_quality configuration; defaulting to best quality.")
+            chosen_format = "bestvideo+bestaudio/best"
+
+    print(f"Using format: {chosen_format}")
 
     if args.game and args.username:
         raise RuntimeError("Only one of `username:` or `game:` must be specified in config.yml!")
@@ -417,7 +459,7 @@ async def main():
     #Check if there are remaining Downloads left.
     remaininDownloads = load_remaining_downloads(remaining_downloads_filename)
     if remaininDownloads and input("A remaining downloads file has been found. Do you want to continue the download? (y/n): ").lower().startswith("y"):
-        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all)
+        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all,chosen_format)
         return
 
     if is_game:
@@ -432,7 +474,7 @@ async def main():
         if not user_id:
             print("User not found")
             return
-    
+
         # Fetch all runs from user
         print("Fetching runs...")
         runs = get_all_runs(user_id)
@@ -443,7 +485,7 @@ async def main():
         raise RuntimeError("Twitch integration must be present if you are requesting a game to be downloaded")
     client = await twitch_integration.TwitchClient.init(args)
     # Checking for highlights
-    highlights = await process_runs(runs, client)
+    highlights = await process_runs(runs, client, args.ignore_links_in_description)
     print(f"Found {len(highlights)} Twitch highlights")
 
     # Save highlights
@@ -452,12 +494,12 @@ async def main():
 
     # Download prompt for users and downloading videos
     if highlights and args.download_videos:
-        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all)
+        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all, chosen_format)
         print("Download completed")
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except Exception as e:
-        print_exception(e)    
+        print_exception(e)
         sys.exit(1)

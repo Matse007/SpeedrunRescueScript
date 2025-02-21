@@ -49,6 +49,10 @@ username: "luckytyphlosion"
 video-folder-name: D:/speedrunrescuescript/videos
 # Whether to download the videos or just look at the output
 download-videos: true
+#specify the desired videoquality ranges from 160 - 1080. Can be left empty, it will default to the best quality.
+video-quality: 720
+#specify if you explicitly want to ignore links that are posted in the run description and only check submission videos.
+ignore-links-in-description: true
 ```
 
 ### Downloading from a speedrun.com leaderboard
@@ -88,7 +92,16 @@ app-id: e3udyluhnly6q6g2qp5a00nwaz73dj
 app-secret: n8p6t5qy6f33lnm3v8jjgwliqazps0
 download-videos: false
 allow-all: false
+#specify the desired videoquality ranges from 160 - 1080. Can be left empty, it will default to the best quality.
+video-quality: 360
+#specify if you explicitly want to ignore links that are posted in the run description and only check submission videos.
+ignore-links-in-description: true
 ```
+
+## Additional filtering
+If `download-videos` is `false`, you can edit the list of files that would be downloaded. For downloading user runs, the relevant files are in `output/user/<username>`. For downloading leaderboard runs, the relevant files are in `output/game/<game>`.
+
+You can delete lines in `remaining_downloads.json` to omit downloading certain files. This can be useful if you want to avoid downloading runs which you know have a mirror elsewhere. Note that if you choose not to process the "remaining downloads file", this file will be overwritten, so please keep a backup somewhere.
 
 ## Errors
 Q: I'm getting outdated information from speedrun.com/Twitch. How do I fix this?
