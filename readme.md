@@ -90,6 +90,11 @@ download-videos: false
 allow-all: false
 ```
 
+## Additional filtering
+If `download-videos` is `false`, you can edit the list of files that would be downloaded. For downloading user runs, the relevant files are in `output/user/<username>`. For downloading leaderboard runs, the relevant files are in `output/game/<game>`.
+
+You can delete lines in `remaining_downloads.json` to omit downloading certain files. This can be useful if you want to avoid downloading runs which you know have a mirror elsewhere. Note that if you choose not to process the "remaining downloads file", this file will be overwritten, so please keep a backup somewhere.
+
 ## Errors
 Q: I'm getting outdated information from speedrun.com/Twitch. How do I fix this?
 
