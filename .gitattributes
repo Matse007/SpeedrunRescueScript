@@ -1,0 +1,8 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+*.txt text
+*.json text
+*.yml text
+*.py text
+*.md text
+*.bat text
