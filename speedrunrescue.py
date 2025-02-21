@@ -132,7 +132,7 @@ def build_custom_fallback_format_string(target_quality, quality_options=[160, 36
 
     return format_string
 
-async def process_runs(runs, client):
+async def process_runs(runs, client, ignore_links_in_description):
     #Extract Twitch highlight urls from runs
     highlights = []
     all_twitch_urls = []
@@ -140,6 +140,8 @@ async def process_runs(runs, client):
         videos = run.get('videos') or {}
         links = videos.get('links') or []
         twitch_urls = []
+        if ignore_links_in_description and links:
+            links = [links[-1]]
         for video in links:
             uri = video.get('uri', '')
             result = is_twitch_video_url(uri)
@@ -406,8 +408,8 @@ async def main():
     ap.add_argument("--cache-filename", dest="cache_filename", default="twitch_cache.json", help="File containing information about users' videos from the Twitch API (for determining if a user has >= 100 hours of highlights). Default is twitch_cache.json")
     ap.add_argument("--download-videos", dest="download_videos", type=convert_bool, help="Whether to download videos after scraping them from speedrun.com", required=True)
     ap.add_argument("--allow-all", dest="allow_all", type=convert_bool, help="Whether to download all found videos regardless of whether or not the channel they exist on have reached the >=100h highlight limit.", required=True)
-    ap.add_argument("--video-quality", dest="video_quality", default="best",help="Desired max video resolution (e.g. 360, 480, 720, 1080) or 'best' for no limit")
-
+    ap.add_argument("--video-quality", dest="video_quality", default="best", help="Desired max video resolution (e.g. 360, 480, 720, 1080) or 'best' for no limit")
+    ap.add_argument("--ignore-links-in-description", dest="ignore_links_in_description", type=convert_bool, help="Whether to ignore twitch links that are in the video description or now. By default this is disabled.", required=True)
     args = ap.parse_args()
 
     chosen_format = ""
@@ -479,7 +481,7 @@ async def main():
         raise RuntimeError("Twitch integration must be present if you are requesting a game to be downloaded")
     client = await twitch_integration.TwitchClient.init(args)
     # Checking for highlights
-    highlights = await process_runs(runs, client)
+    highlights = await process_runs(runs, client, args.ignore_links_in_description)
     print(f"Found {len(highlights)} Twitch highlights")
 
     # Save highlights

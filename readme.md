@@ -49,6 +49,10 @@ username: "luckytyphlosion"
 video-folder-name: D:/speedrunrescuescript/videos
 # Whether to download the videos or just look at the output
 download-videos: true
+#specify the desired videoquality ranges from 160 - 1080. Can be left empty, it will default to the best quality.
+video-quality: 720
+#specify if you explicitly want to ignore links that are posted in the run description and only check submission videos.
+ignore-links-in-description: true
 ```
 
 ### Downloading from a speedrun.com leaderboard
@@ -90,6 +94,8 @@ download-videos: false
 allow-all: false
 #specify the desired videoquality ranges from 160 - 1080. Can be left empty, it will default to the best quality.
 video-quality: 360
+#specify if you explicitly want to ignore links that are posted in the run description and only check submission videos.
+ignore-links-in-description: true
 ```
 
 ## Additional filtering
