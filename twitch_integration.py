@@ -5,9 +5,10 @@ import json
 import pathlib
 import itertools
 import re
+import sys
 
-twitch_c_v_url_regex = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:m.)?(?:secure\.)?twitch\.tv\/(\w+)\/([cv])\/(\d+)", re.IGNORECASE)
-twitch_current_url_regex = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:m.)?(?:secure\.)?twitch\.tv\/videos/(\d+)", re.IGNORECASE)
+twitch_c_v_url_regex = re.compile(r"(?:https?:\/\/)?(?:\w+\.)?twitch\.tv\/(\w+)\/([cv])\/(\d+)", re.IGNORECASE)
+twitch_current_url_regex = re.compile(r"(?:https?:\/\/)?(?:\w+\.)?twitch\.tv\/videos/(\d+)", re.IGNORECASE)
 
 def grouper(iterable, n):
     it = iter(iterable)
@@ -149,12 +150,14 @@ class UserCache:
     
         video_info = self.cache_info["video_infos"].get(video_id)
         if video_info is None or video_info.get("missing"):
-            return False
+            # Want to report missing videos via yt-dlp
+            return True
 
         username = video_info["user_login"]
         user_info = self.cache_info["user_infos"].get(username)
         if user_info is None:
-            return False
+            # Be safe and download the video if for some reason the username doesn't exist
+            return True
 
         if user_info["total_duration"] >= 360000:
             return True
@@ -179,24 +182,38 @@ class UserCache:
         return user_info
 
     def save_cache(self):
-        with open(self.cache_filename, "w+") as f:
-            json.dump(self.cache_info, f, indent=2)
+        exit_after_write = False
+        cache_info_as_str = json.dumps(self.cache_info, indent=2)
+        while True:
+            try:
+                with open(self.cache_filename, "w+") as f:
+                    f.write(cache_info_as_str)
+
+                break
+            except KeyboardInterrupt:
+                print("Saving Twitch cache, please stop Ctrl-C'ing")
+                exit_after_write = True
+
+        if exit_after_write:
+            sys.exit(1)
 
 class TwitchClient:
-    __slots__ = ("config", "twitch", "user_cache")
+    __slots__ = ("twitch", "user_cache")
 
-    def __init__(self, config, twitch):
-        self.config = config
+    def __init__(self, args, twitch):
         self.twitch = twitch
-        self.user_cache = UserCache(self.config["cache_filename"])
+        self.user_cache = UserCache(args.cache_filename)
 
     @classmethod
-    async def init(cls, config):
-        app_id = config["app_id"]
-        app_secret = config["app_secret"]
-        twitch = await Twitch(app_id, app_secret)
+    async def init(cls, args):
+        app_id = args.app_id
+        app_secret = args.app_secret
+        if app_id is None or app_secret is None:
+            twitch = None
+        else:
+            twitch = await Twitch(app_id, app_secret)
 
-        return cls(config, twitch)
+        return cls(args, twitch)
 
     async def fetch_info(self, video_urls):
         await self.user_cache.update_video_infos_from_video_urls(self.twitch, video_urls)

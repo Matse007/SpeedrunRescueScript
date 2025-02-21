@@ -4,6 +4,7 @@ import pathlib
 import json
 import time
 import re
+import sys
 
 class CacheSettings:
     __slots__ = ("read_cache", "write_cache", "cache_dirname", "rate_limit", "retry_on_empty")
@@ -91,8 +92,19 @@ def get_in_loop_code(endpoint, params, cache_settings):
 
     if cache_settings.write_cache:
         endpoint_as_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(endpoint_as_path, "w+", encoding="utf-8") as f:
-            json.dump(data, f, separators=(",", ":"))
+        data_as_str = json.dumps(data, separators=(",", ":"))
+        exit_after_write = False
+        while True:
+            try:
+                with open(endpoint_as_path, "w+", encoding="utf-8") as f:
+                    f.write(data_as_str)
+                break
+            except KeyboardInterrupt:
+                print("Saving speedrun.com API cache, please stop Ctrl-C'ing")
+                exit_after_write = True
+
+        if exit_after_write:
+            sys.exit(1)
 
     if cache_settings.rate_limit:
         time.sleep(1)
