@@ -178,3 +178,4 @@ srcom_cached/
 output/
 twitch_cache.json
 config.json
+config.yml
