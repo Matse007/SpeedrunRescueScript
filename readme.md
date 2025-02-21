@@ -66,8 +66,14 @@ There are two ways of editing `config.yml`, depending on your purposes. These tw
 3. Optionally, you can [specify](#specifying-an-option) the option `video-folder-name`, which will control the folder where your videos are stored. You can get the folder name by double clicking the address bar in Windows Explorer of the folder you want. Note that you must use forward slashes as path separators, e.g. `D:\speedrunrescuescript\videos` must become `D:/speedrunrescuescript/videos`. If you aren't sure, leave it as `videos`.
 4. [Ignore](#ignoring-an-option) the `app-id` and `app-secret` options if they exist.
 5. [Specify](#specifying-an-option) the `download-videos` option, by putting `true` if you want to fetch information about the user's runs and download the videos, or `false` if you only want to fetch the information.
+6. Optionally, you can [specify](#specifying-an-option) a video quality target using the `video-quality` option. The value should either be the video quality or the video height which you want to target, e.g. `"360p"`, `"720"`, `"1080p"`, `"542"`. It can also be `"best"`, which will just automatically download the highest quality video. The program will default to `"best"` is this option is omitted. **THIS OPTION SHOULD BE IN QUOTES**, i.e. do `"360p"`, not `360p`. In case the specified quality cannot be found, the program will try to find an adjacent quality and download that. Add `>=` before the quality to download the closest higher quality, e.g. `">=480p"`, and `>=` to download the closest lower quality, e.g. `"<=480p"`. If neither are specified, the program assumes `>=` is chosen. For example, if a video has the quality options 360p and 542p, this is the logic of `>=` and `<=`:
+    - `>=480p`: Will download 542p, as it is the next higher quality
+    - `<=480p`: Will download 360p, as it is the next lower quality
 
-Here is an example config that will download twitch runs from [speedrun.com user luckytyphlosion](https://speedrun.com/users/luckytyphlosion). Note that `#` indicates a comment, i.e. the text will be ignored. You can add your own notes using comments.
+    Sometimes, the lower quality encodes Twitch produces are greater in size than the lower quality resolutions (e.g. viewing the sizes of [this video](https://www.twitch.tv/videos/1906117644) using [TwitchDownloader](https://github.com/lay295/TwitchDownloader) says that the Source resolution is smaller than 480p). After deciding the desired quality, the program will check if this is the case, and download the Source quality if it is smaller than the initial desired quality.
+7. [Specify](#specifying-an-option) the `ignore-links-in-description` option with `true` if want to ignore video links that are posted in the run description and only check video links in the submission field, and `false` if you want to check links from both the submission field and the description. Not recommended as some people put other parts of the run in the description.
+
+Here is an example config that will download twitch runs from [speedrun.com user luckytyphlosion](https://speedrun.com/users/luckytyphlosion).
 ```yaml
 # Specify either a game or a speedrun.com username
 username: "luckytyphlosion"
@@ -76,9 +82,9 @@ video-folder-name: D:/speedrunrescuescript/videos
 # Whether to download the videos or just look at the output
 download-videos: true
 #specify the desired videoquality ranges from 160 - 1080. Can be left empty, it will default to the best quality.
-video-quality: 720
+video-quality: ">=1080p"
 #specify if you explicitly want to ignore links that are posted in the run description and only check submission videos.
-ignore-links-in-description: true
+ignore-links-in-description: false
 ```
 
 ### Downloading from a speedrun.com leaderboard
@@ -106,8 +112,14 @@ Before you start, you must set up a Twitch API App. You will only need to do thi
 5. [Specify](#ignoring-an-option) the `app-secret` option. The value should be the **Client Secret** which you saved earlier.
 6. [Specify](#specifying-an-option) the `download-videos` option, by putting `true` if you want to fetch information about the user's runs and download the videos, or `false` if you only want to fetch the information.
 7. [Specify](#specifying-an-option) the `allow-all` option. This should be `false` if you only want to download videos of channels who have not reached the 100h limit, or `true` if you want to download all runs regardless.
+8. Optionally, you can [specify](#specifying-an-option) a video quality target using the `video-quality` option. The value should either be the video quality or the video height which you want to target, e.g. `"360p"`, `"720"`, `"1080p"`, `"542"`. It can also be `"best"`, which will just automatically download the highest quality video. The program will default to `"best"` is this option is omitted. **THIS OPTION SHOULD BE IN QUOTES**, i.e. do `"360p"`, not `360p`. In case the specified quality cannot be found, the program will try to find an adjacent quality and download that. Add `>=` before the quality to download the closest higher quality, e.g. `">=480p"`, and `>=` to download the closest lower quality, e.g. `"<=480p"`. If neither are specified, the program assumes `>=` is chosen. For example, if a video has the quality options 360p and 542p, this is the logic of `>=` and `<=`:
+    - `>=480p`: Will download 542p, as it is the next higher quality
+    - `<=480p`: Will download 360p, as it is the next lower quality
 
-Here is an example config that will download twitch runs from [the speedrun.com leaderboard for Rockman EXE 4.5: Real Operation](https://speedrun.com/mmbn4.5). Note that `#` indicates a comment, i.e. the text will be ignored. You can add your own notes using comments.
+    Sometimes, the lower quality encodes Twitch produces are greater in size than the lower quality resolutions (e.g. viewing the sizes of [this video](https://www.twitch.tv/videos/1906117644) using [TwitchDownloader](https://github.com/lay295/TwitchDownloader) says that the Source resolution is smaller than 480p). After deciding the desired quality, the program will check if this is the case, and download the Source quality if it is smaller than the initial desired quality.
+9. [Specify](#specifying-an-option) the `ignore-links-in-description` option with `true` if want to ignore video links that are posted in the run description and only check video links in the submission field, and `false` if you want to check links from both the submission field and the description. Not recommended as some people put other parts of the run in the description.
+
+Here is an example config that will download twitch runs from [the speedrun.com leaderboard for Rockman EXE 4.5: Real Operation](https://speedrun.com/mmbn4.5).
 ```yaml
 # Specify either a game or a speedrun.com username
 game: "mmbn4.5"
@@ -119,9 +131,9 @@ app-secret: n8p6t5qy6f33lnm3v8jjgwliqazps0
 download-videos: false
 allow-all: false
 #specify the desired videoquality ranges from 160 - 1080. Can be left empty, it will default to the best quality.
-video-quality: 360
+video-quality: ">=1080p"
 #specify if you explicitly want to ignore links that are posted in the run description and only check submission videos.
-ignore-links-in-description: true
+ignore-links-in-description: false
 ```
 
 ## Additional filtering
