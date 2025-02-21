@@ -32,14 +32,40 @@ To run the script, run `python speedrunrescue.py`. Please read the [configuratio
 ## Configuration
 Options to the program are provided in a file called `config.yml`, in the same folder as the script (For executable users, do not worry, where config.yml is placed is correct).
 
+Telling the program what to do is very simple. The program is controlled by options, which dictates one aspect of what the program should do.
+
+### Specifying an option
+To specify an option:
+1. Find an empty line to place the option.
+2. Place the option name, e.g. `username`, followed by a colon and a space (`: `), followed by the option value, e.g. `luckytyphlosion`.
+
+For this example, the full option would be:
+```
+username: luckytyphlosion
+```
+
+You should not list the same option multiple times. For example, **do not** do this:
+```
+username: luckytyphlosion
+username: Matse007
+```
+
+This is important as in the pre-made `config.yml` in the executable release, some options have already been specified, so you should not add multiple of the option.
+
+### Ignoring an option
+Sometimes, you may to ignore an option in your configuration. There are two ways to do this.
+1. Add a `#` at the start of the option. For example, `#username: luckytyphlosion`
+2. Remove the option entirely by deleting the line.
+
+## Tasks
 There are two ways of editing `config.yml`, depending on your purposes. These two are explained below.
 
 ### Downloading from a speedrun.com user
-1. Delete the line starting with `game:` in the `config.yml`. If it doesn't exist, ignore this step.
-2. Add a line starting with `username:`, and after, add the speedrun.com username of the user you want the runs of in "quotes". If a line starting with `username:` already exists, replace the contents after the line with the speedrun.com username.
-3. Optionally, you can add a separate folder name for where the videos will be stored, at `video-folder-name:`. You can get the folder name by double clicking the address bar in Windows Explorer of the folder you want. Note that you must use forward slashes as path separators, e.g. `D:\speedrunrescuescript\videos` must become `D:/speedrunrescuescript/videos`. If you aren't sure, leave it as `videos`. 
-4. Delete the lines starting with `app-id` and `app-secret` if they exist. Alternatively, add `#` to the start of the line to comment it out.
-5. At the line starting with `download-videos:`, put `true` or `false` to indicate whether you want to download the videos, or just fetch information about the speedrun.com user's runs.
+1. [Ignore](#ignoring-an-option) the `game` option if it is there and not ignored already. 
+2. [Specify](#specifying-an-option) an option called `username`. The value should be the speedrun.com username for which you want to download runs from.
+3. Optionally, you can [specify](#specifying-an-option) the option `video-folder-name`, which will control the folder where your videos are stored. You can get the folder name by double clicking the address bar in Windows Explorer of the folder you want. Note that you must use forward slashes as path separators, e.g. `D:\speedrunrescuescript\videos` must become `D:/speedrunrescuescript/videos`. If you aren't sure, leave it as `videos`.
+4. [Ignore](#ignoring-an-option) the `app-id` and `app-secret` options if they exist.
+5. [Specify](#specifying-an-option) the `download-videos` option, by putting `true` if you want to fetch information about the user's runs and download the videos, or `false` if you only want to fetch the information.
 
 Here is an example config that will download twitch runs from [speedrun.com user luckytyphlosion](https://speedrun.com/users/luckytyphlosion). Note that `#` indicates a comment, i.e. the text will be ignored. You can add your own notes using comments.
 ```yaml
@@ -73,13 +99,13 @@ Before you start, you must set up a Twitch API App. You will only need to do thi
     * **WARNING: DO NOT SHARE THIS CLIENT SECRET**. Letting it become public can lead to people abusing the API with **YOUR** account, and can possibly lead to you getting banned from Twitch.
 
 #### Setting up the configuration for a speedrun.com leaderboard
-1. Delete the line starting with `username:` in the `config.yml`. If it doesn't exist, ignore this step.
-2. Add a line starting with `game:`, and after, add the speedrun.com game abbreviation of the leaderboard you want to download. You can find the abbreviation in the url of a leaderboard, after `speedrun.com`. For example, the abbreviation of https://speedrun.com/sm64 is `sm64`. If a line starting with `game:` already exists, replace the contents after the line with the speedrun.com game.
-3. Optionally, you can add a separate folder name for where the videos will be stored, at `video-folder-name:`. You can get the folder name by double clicking the address bar in Windows Explorer of the folder you want. Note that you must use forward slashes as path separators, e.g. `D:\speedrunrescuescript\videos` must become `D:/speedrunrescuescript/videos`. If you aren't sure, leave it as `videos`. 
-4. At the line starting with `app-id:`, paste the **Client ID** after `app-id:` which you saved earlier.
-5. At the line starting with `app-secret:`, paste the **Client Secret** after `app-secret:` which you saved earlier.
-6. At the line starting with `download-videos:`, put `true` or `false` to indicate whether you want to download the videos, or just fetch information about the speedrun.com user's runs.
-7. By default, the script will only download videos of channels who have not reached the 100h limit. If you want to download all runs irregardless of at-risk status, then add the following line: `allow-all: true`. Otherwise, don't add the line, or add `allow-all: false`.
+1. [Ignore](#ignoring-an-option) the `username` option if it is there and not ignored already. 
+2. [Specify](#specifying-an-option) an option called `gane`. The value should be the speedrun.com game abbreviation of the leaderboard you want to download. You can find the abbreviation in the url of a leaderboard, after `speedrun.com`. For example, the abbreviation of https://speedrun.com/sm64 is `sm64`.
+3. Optionally, you can [specify](#specifying-an-option) the option `video-folder-name`, which will control the folder where your videos are stored. You can get the folder name by double clicking the address bar in Windows Explorer of the folder you want. Note that you must use forward slashes as path separators, e.g. `D:\speedrunrescuescript\videos` must become `D:/speedrunrescuescript/videos`. If you aren't sure, leave it as `videos`.
+4. [Specify](#ignoring-an-option) the `app-id` option. The value should be the **Client ID** which you saved earlier.
+5. [Specify](#ignoring-an-option) the `app-secret` option. The value should be the **Client Secret** which you saved earlier.
+6. [Specify](#specifying-an-option) the `download-videos` option, by putting `true` if you want to fetch information about the user's runs and download the videos, or `false` if you only want to fetch the information.
+7. [Specify](#specifying-an-option) the `allow-all` option. This should be `false` if you only want to download videos of channels who have not reached the 100h limit, or `true` if you want to download all runs regardless.
 
 Here is an example config that will download twitch runs from [the speedrun.com leaderboard for Rockman EXE 4.5: Real Operation](https://speedrun.com/mmbn4.5). Note that `#` indicates a comment, i.e. the text will be ignored. You can add your own notes using comments.
 ```yaml
