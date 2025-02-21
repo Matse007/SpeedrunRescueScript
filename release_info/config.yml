@@ -14,3 +14,10 @@ download-videos: true
 
 # For games, whether to download all videos irregardless of whether or not the channel has exceeded the 100 hour highlight limit
 allow-all: false
+
+# specify the desired video quality (or height of the video). See the readme for more info. Can be left empty, it will default to the best quality.
+video-quality: "best"
+
+# specify if you explicitly want to ignore links that are posted in the run description and only check submission videos.
+ignore-links-in-description: false
+
