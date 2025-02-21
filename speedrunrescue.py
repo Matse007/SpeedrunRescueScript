@@ -178,15 +178,12 @@ def format_date_of_submission(dateobj):
 def save_highlights(highlights, client, is_game, highlights_filename, remaining_downloads_filename, highlights_json_filename):
     #saving all highlights in a formatted way for the user i guess? My hope is I can automate uploads later
     num_at_risk = 0
-    with open("config.json") as f:
-        config = json.load(f)
-    download_all = config.get("allow_all_downloads", False)
-    
+
     for highlight in highlights:
         new_twitch_urls = []
         at_risk = False
         for twitch_url in highlight["urls"]:
-            if download_all or not is_game:
+            if not is_game:
                 at_risk = True
             else:
                 at_risk = client.is_video_at_risk(twitch_url)
@@ -358,6 +355,14 @@ def load_remaining_downloads(remaining_downloads_filename):
     except Exception as e:
         print(f"Unexpected error: {e}")
 
+def convert_bool(value):
+    value_str_lower = value.lower()
+    if value_str_lower == "true":
+        return True
+    elif value_str_lower == "false":
+        return False
+    else:
+        raise configargparse.ArgumentTypeError(f"Invalid bool type (must be `true` or `false`, got {value})")
 
 async def main():
     ap = configargparse.ArgumentParser(
@@ -375,8 +380,8 @@ async def main():
     ap.add_argument("--app-secret", dest="app_secret", default=None, help="Name of the Twitch API App Secret. See `app-id:` for more info")
     ap.add_argument("--video-folder-name", dest="video_folder_name", default="videos", help="Folder where the videos will be stored. Videos will automatically be sorted by game and username. Will be created if it doesn't exist already. Default is a folder \"videos\" in the same directory as the script")
     ap.add_argument("--cache-filename", dest="cache_filename", default="twitch_cache.json", help="File containing information about users' videos from the Twitch API (for determining if a user has >= 100 hours of highlights). Default is twitch_cache.json")
-    ap.add_argument("--download-videos", dest="download_videos", default=False, help="Whether to download videos after scraping them from speedrun.com", required=True)
-    ap.add_argument("--allow-all", dest="allow_all", default=False, help="Whether to download all found videos regardless of whether or not the channel they exist on have reached the >=100h highlight limit.", required=True)
+    ap.add_argument("--download-videos", dest="download_videos", type=convert_bool, help="Whether to download videos after scraping them from speedrun.com", required=True)
+    ap.add_argument("--allow-all", dest="allow_all", type=convert_bool, help="Whether to download all found videos regardless of whether or not the channel they exist on have reached the >=100h highlight limit.", required=True)
 
     args = ap.parse_args()
 

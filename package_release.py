@@ -4,13 +4,14 @@ import pathlib
 import shutil
 import platform
 import argparse
+import PyInstaller.__main__
 
 def main():
     with open("build_options.yml", "r") as f:
         options = yaml.safe_load(f)
 
     print("Building executable!")
-    subprocess.run(("pyinstaller", "-F", "--noconfirm", "speedrunrescue.py", "--paths", "virt_win/Lib/site-packages"), check=True)
+    PyInstaller.__main__.run(["speedrunrescue.py", "-D", "--noconfirm"])
 
     release_name = options["release_name"]
     release_dirname = f"release_working/{release_name}"
@@ -21,11 +22,11 @@ def main():
 
     print("Copying over files!")
     shutil.copytree("release_info", release_dirpath)
-    shutil.copy2("dist/speedrunrescue.exe", f"{release_dirname}/bin/speedrunrescue.exe")
+    shutil.copytree("dist/speedrunrescue", f"{release_dirname}/bin")
 
     print("Creating zip archive!")
-    sevenz_filename = options["sevenz-filename"]
-
+    sevenz_filename = options["sevenz_filename"]
+    
     subprocess.run((sevenz_filename, "a", f"release_working/SpeedrunRescueScript_{release_name}.zip", f"./{release_dirname}/*", "-tzip", "-mx=9", "-mfb=258", "-mpass=3", "-mmt=off"), check=True)
 
 if __name__ == "__main__":
