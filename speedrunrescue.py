@@ -297,6 +297,7 @@ Description:
                 current_url = url_info
                 src_link = "N/A"
 
+            sleep_time = 15
             if allow_all or current_url.endswith("*****"):
                 clean_url = current_url.replace("*****", "") # Cleaning up the extraspacing
                 print(f"Downloading: {clean_url}")
@@ -311,19 +312,22 @@ Description:
                             print(f"Skipping invalid or dead link: {clean_url}")
                             with open(downloaded_video_info_filename, "a+") as f:
                                 f.write(f"{clean_url} for {src_link} does not exist\n==========================================================\n")
+                            #sleep_time = 15
 
-                        elif "HTTP Error 403: Forbidden" in error_msg:
-                            print(f"You have been rate-limited, or something is preventing Twitch access. Your progress has been saved. Please try again later.")
-                            sys.exit(1)
                         else:
                             print_exception(e, f"Failed to download {clean_url}: ")
-                            sys.exit(1)
+                            with open(downloaded_video_info_filename, "a+") as f:
+                                f.write(f"Failed to download {clean_url}: {error_msg}\n==========================================================\n")
             else:
                 print(f"Skipping {clean_url} (not marked as at-risk)")
+                sleep_time = 0
 
             urls.pop(0)
             with open(remaining_downloads_filename, "w", encoding="utf-8") as f:
                 json.dump(urls, f, indent=4)
+            if sleep_time != 0:
+                print(f"Waiting {sleep_time} seconds before downloading the next video.")
+                time.sleep(sleep_time)
         except FileNotFoundError:
             print("No remaining downloads file found")
             break
