@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import re
 import time
 import requests
@@ -48,16 +49,34 @@ def get_all_runs(user_id):
     #gettign all runs with pagination in mind.
     runs = []
     offset = 0
+    direction = "asc"
+    last_id = ""
 
     while True:
-        url = f"/runs?user={user_id}&max=200&offset={offset}&status=verified&embed=game,category,players"
+        url = f"/runs?user={user_id}&max=200&offset={offset}&status=verified&embed=game,category,players&direction={direction}&orderby=date"
         try:
             data = srcomapi.get(url)
+            if last_id:
+                found_duplicate = False
+                for index, run in enumerate(data['data']):
+                    if run['id'] == last_id:
+                        runs.extend(data['data'][0:index])
+                        found_duplicate = True
+                        break
+                if found_duplicate:
+                    break
             runs.extend(data['data'])
             # Pagination check
             if data['pagination']['size'] < 200:
                 break
             offset += 200
+            if offset >= 10_000:
+                if not last_id:
+                    last_id = runs[-1]["id"]
+                    direction = "desc"
+                    offset = 0
+                else:
+                    break
         except requests.exceptions.RequestException as e:
             print(f"Error fetching runs: {e}")
             break
@@ -66,18 +85,36 @@ def get_all_runs(user_id):
 def get_all_runs_from_game(game_id):
     runs = []
     offset = 0
+    direction = "asc"
+    last_id = ""
 
     while True:
-        url = f"/runs?game={game_id}&max=200&offset={offset}&status=verified&embed=game,category,players"
+        url = f"/runs?game={game_id}&max=200&offset={offset}&status=verified&embed=game,category,players&direction={direction}&orderby=date"
         try:
             print(f"offset: {offset}")
             data = srcomapi.get(url)
+            if last_id:
+                found_duplicate = False
+                for index, run in enumerate(data['data']):
+                    if run['id'] == last_id:
+                        runs.extend(data['data'][0:index])
+                        found_duplicate = True
+                        break
+                if found_duplicate:
+                    break
             runs.extend(data['data'])
 
             # Pagination check
             if data['pagination']['size'] < 200:
                 break
             offset += 200
+            if offset >= 10_000:
+                if not last_id:
+                    last_id = runs[-1]["id"]
+                    direction = "desc"
+                    offset = 0
+                else:
+                    break
         except requests.exceptions.RequestException as e:
             print(f"Error fetching runs: {e}")
             break
