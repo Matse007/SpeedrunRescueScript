@@ -22,7 +22,7 @@ Before running the script you need to have the following tools installed:
 1. Click the Code button on top of the webpage and press download Zip. If you are an advanced user, clone the repository.
 2. Unpack the zip file or go into the folder and open a command line. If you are on Windows you can do that by clicking into the Link field in windows explorer and typing in cmd.
 3. Install all the dependencies using the following command (copy pasting this into the command prompt)
-```pyton
+```sh
 pip install -r requirements.txt
 ```
 4. Make sure to have ffmpeg installed. This script is using yt-dlp which absolutely requires ffmpeg. Look for an installation guide for installing ffmpeg. You can download it here on [their official website](https://ffmpeg.org/download.html)
@@ -106,7 +106,7 @@ Before you start, you must set up a Twitch API App. You will only need to do thi
 
 #### Setting up the configuration for a speedrun.com leaderboard
 1. [Ignore](#ignoring-an-option) the `username` option if it is there and not ignored already. 
-2. [Specify](#specifying-an-option) an option called `gane`. The value should be the speedrun.com game abbreviation of the leaderboard you want to download. You can find the abbreviation in the url of a leaderboard, after `speedrun.com`. For example, the abbreviation of https://speedrun.com/sm64 is `sm64`.
+2. [Specify](#specifying-an-option) an option called `game`. The value should be the speedrun.com game abbreviation of the leaderboard you want to download. You can find the abbreviation in the url of a leaderboard, after `speedrun.com`. For example, the abbreviation of https://speedrun.com/sm64 is `sm64`.
 3. Optionally, you can [specify](#specifying-an-option) the option `video-folder-name`, which will control the folder where your videos are stored. You can get the folder name by double clicking the address bar in Windows Explorer of the folder you want. Note that you must use forward slashes as path separators, e.g. `D:\speedrunrescuescript\videos` must become `D:/speedrunrescuescript/videos`. If you aren't sure, leave it as `videos`.
 4. [Specify](#ignoring-an-option) the `app-id` option. The value should be the **Client ID** which you saved earlier.
 5. [Specify](#ignoring-an-option) the `app-secret` option. The value should be the **Client Secret** which you saved earlier.
