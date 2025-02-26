@@ -400,7 +400,7 @@ class QualityPostprocessor(yt_dlp.postprocessor.PostProcessor):
 
         return [], info
 
-def download_videos(remaining_downloads_filename, video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, allow_all, desired_quality):
+def download_videos(remaining_downloads_filename, video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, allow_all, desired_quality, concurrent_fragments):
     #pathlib.Path(download_folder_name).mkdir(parents=True, exist_ok=True)
     #downloading videos out of the provided dict using the yt-dlp module.
 
@@ -427,6 +427,7 @@ Description:
         'sleep-interval': 5, #so i dont get insta blacklisted by twitch
         'retries': 1,  # Retry a second time a bit later in case there was simply an issue
         'retry-delay': 10,  # Wait 10 seconds before retrying
+        'concurrent_fragment_downloads': concurrent_fragments,
     }
 
     if desired_quality.download_best:
@@ -547,6 +548,7 @@ async def main():
     ap.add_argument("--allow-all", dest="allow_all", type=convert_bool, help="Whether to download all found videos regardless of whether or not the channel they exist on have reached the >=100h highlight limit.", required=True)
     ap.add_argument("--video-quality", dest="video_quality", default="best", help="Desired closest video quality that you want to download. For this option, specify the video quality or desired height of the video, e.g. 360p, 720, 1080, 542. Choosing \"best\" will just download the best quality available. THIS OPTION SHOULD BE IN QUOTES, i.e. do \"360p\", not 360p. You can also add >= or <= before the quality to tell the program whether to download the closest higher quality or closest lower quality, respectively, if the quality does not exist. If you omit >= and <=, it defaults to choosing the closest higher quality. Defaults to \"best\".")
     ap.add_argument("--ignore-links-in-description", dest="ignore_links_in_description", type=convert_bool, help="Whether to ignore twitch links that are in the video description or not. By default this is disabled.", required=True)
+    ap.add_argument("--concurrent-fragments", dest="concurrent_fragments", type=int, help="How many concurrent fragments to download of a video. By default this is 1.")
     args = ap.parse_args()
 
     desired_quality = DesiredQuality.from_string(args.video_quality)
@@ -577,10 +579,12 @@ async def main():
     remaining_downloads_filename = f"{base_output_dirpath}/remaining_downloads.json"
     downloaded_video_info_filename = f"{base_output_dirpath}/download_info.txt"
 
+    concurrent_fragments = args.concurrent_fragments or 1
+
     #Check if there are remaining Downloads left.
     remaininDownloads = load_remaining_downloads(remaining_downloads_filename)
     if remaininDownloads and input("A remaining downloads file has been found. Do you want to continue the download? (y/n): ").lower().startswith("y"):
-        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all, desired_quality)
+        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all, desired_quality, concurrent_fragments)
         return
 
     if is_game:
@@ -615,7 +619,7 @@ async def main():
 
     # Download prompt for users and downloading videos
     if highlights and args.download_videos:
-        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all, desired_quality)
+        download_videos(remaining_downloads_filename, args.video_folder_name, downloaded_video_info_filename, download_type_str, game_or_username, args.allow_all, desired_quality, concurrent_fragments)
         print("Download completed")
 
 if __name__ == "__main__":
