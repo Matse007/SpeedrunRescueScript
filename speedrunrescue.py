@@ -172,7 +172,6 @@ async def process_runs(runs, client, ignore_links_in_description):
                 if player["rel"] == "guest":
                     player_names.append(player["name"])
                 else:
-                    user_data = player.get("data", {})
                     twitch_info = player.get("twitch")
                     if twitch_info is not None:
                         player_twitch_yt_urls.append(twitch_info["uri"])
@@ -558,15 +557,14 @@ async def main():
         raise RuntimeError("Only one of `username:` or `game:` must be specified in config.yml!")
 
     game = args.game
+    username = args.username
     if game:
         download_type_str = "game"
         game_or_username = game
         is_game = True
+    elif not username:
+        raise RuntimeError("One of `username:` or `game:` must be specified in config.yml!")
     else:
-        username = args.username
-        if not username:
-            raise RuntimeError("One of `username:` or `game:` must be specified in config.yml!")
-
         download_type_str = "user"
         game_or_username = username
         is_game = False
