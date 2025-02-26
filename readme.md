@@ -118,6 +118,7 @@ Before you start, you must set up a Twitch API App. You will only need to do thi
 
     Sometimes, the lower quality encodes Twitch produces are greater in size than the lower quality resolutions (e.g. viewing the sizes of [this video](https://www.twitch.tv/videos/1906117644) using [TwitchDownloader](https://github.com/lay295/TwitchDownloader) says that the Source resolution is smaller than 480p). After deciding the desired quality, the program will check if this is the case, and download the Source quality if it is smaller than the initial desired quality.
 9. [Specify](#specifying-an-option) the `ignore-links-in-description` option with `true` if want to ignore video links that are posted in the run description and only check video links in the submission field, and `false` if you want to check links from both the submission field and the description. Not recommended as some people put other parts of the run in the description.
+10. Optionally you can [specify](#specifying-an-option) the `concurrent-fragments` option with a postive integer of how many video fragments you want to download concurrently. Note that this will create the specified number of threads so if your system can't handle this leave this at 1.
 
 Here is an example config that will download twitch runs from [the speedrun.com leaderboard for Rockman EXE 4.5: Real Operation](https://speedrun.com/mmbn4.5).
 ```yaml
