@@ -51,7 +51,6 @@ def get_personal_bests(user_id):
     try:
         # Fetch all personal bests in a single request
         data = srcomapi.get(url)
-        print(data)
         # Extract the runs from the response
         if data and 'data' in data:
             for pb in data['data']:
