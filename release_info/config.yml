@@ -21,3 +21,8 @@ video-quality: "best"
 # specify if you explicitly want to ignore links that are posted in the run description and only check submission videos.
 ignore-links-in-description: false
 
+#specify if you explicitly only want to only look at your personal bests.
+safe-only-pbs: true
+
+#amount of concurrent video fragments that you want to download concurrently. Note that this will create the specified number of threads so if your system can't handle this leave this at 1.
+concurrent-fragments: 1
