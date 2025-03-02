@@ -45,6 +45,26 @@ def get_game_id(game):
     game_id = data["data"][0]["id"]
     return game_id
 
+def get_personal_bests(user_id):
+    run_ids = []
+    url = f"/users/{user_id}/personal-bests?embed=game,category"
+    try:
+        # Fetch all personal bests in a single request
+        data = srcomapi.get(url)
+        print(data)
+        # Extract the runs from the response
+        if data and 'data' in data:
+            for pb in data['data']:
+                pb = pb['run']['id']
+                run_ids.append(pb)
+            return set(run_ids)
+        else:
+            print("No personal bests found or invalid response from the API.")
+            return []
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching personal bests: {e}")
+        return []
+
 def get_all_runs(user_id):
     #gettign all runs with pagination in mind.
     runs = []
@@ -528,6 +548,9 @@ def convert_bool(value):
     else:
         raise configargparse.ArgumentTypeError(f"Invalid bool type (must be `true` or `false`, got {value})")
 
+def process_personal_bests(runs, pb_ids):
+    return [run for run in runs if run["id"] in pb_ids]
+
 async def main():
     ap = configargparse.ArgumentParser(
         allow_abbrev=False,
@@ -549,6 +572,7 @@ async def main():
     ap.add_argument("--video-quality", dest="video_quality", default="best", help="Desired closest video quality that you want to download. For this option, specify the video quality or desired height of the video, e.g. 360p, 720, 1080, 542. Choosing \"best\" will just download the best quality available. THIS OPTION SHOULD BE IN QUOTES, i.e. do \"360p\", not 360p. You can also add >= or <= before the quality to tell the program whether to download the closest higher quality or closest lower quality, respectively, if the quality does not exist. If you omit >= and <=, it defaults to choosing the closest higher quality. Defaults to \"best\".")
     ap.add_argument("--ignore-links-in-description", dest="ignore_links_in_description", type=convert_bool, help="Whether to ignore twitch links that are in the video description or not. By default this is disabled.", required=True)
     ap.add_argument("--concurrent-fragments", dest="concurrent_fragments", type=int, help="How many concurrent fragments to download of a video. By default this is 1.")
+    ap.add_argument("--safe-only-pbs", dest="save_only_pbs", type=convert_bool,help="If set to true, only the PBs of the runner or all PBs on the leaderboard are being saved.",required=True)
     args = ap.parse_args()
 
     desired_quality = DesiredQuality.from_string(args.video_quality)
@@ -603,6 +627,9 @@ async def main():
         # Fetch all runs from user
         print("Fetching runs...")
         runs = get_all_runs(user_id)
+        if args.save_only_pbs:
+            pb_ids = get_personal_bests(user_id)
+            runs = process_personal_bests(runs, pb_ids)
 
     print(f"Found {len(runs)} verified runs")
 
