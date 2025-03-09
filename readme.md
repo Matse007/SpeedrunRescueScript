@@ -6,6 +6,10 @@ With the [recent changes to Twitch highlights](https://x.com/twitchsupport/statu
 
 Have any questions? Ask in the [official speedrun.com Discord](https://discord.gg/0h6sul1ZwHVpXJmK).
 
+For people prefering a video tutorial, here is one that helps you to setup the tool on windows.
+
+https://www.youtube.com/watch?v=tkgnHt2aVmQ
+
 # Setup (Executable, Windows only)
 1. Download the latest release [here](https://github.com/Matse007/SpeedrunRescueScript/releases/latest). Be sure to download the file called "SpeedrunRescueScript_v{xxx}.zip", where {xxx} is the version number.
 2. Extract the zip file and open its contents.
