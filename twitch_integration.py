@@ -137,7 +137,8 @@ class UserCache:
         for username, user_info in self.cache_info["user_infos"].items():
             total_duration = 0
             for video_id, user_video_info in user_info["videos"].items():
-                total_duration += parse_duration(user_video_info["duration"])
+                if user_video_info["type"] == "highlight":
+                    total_duration += parse_duration(user_video_info["duration"])
 
             user_info["total_duration"] = total_duration
 
