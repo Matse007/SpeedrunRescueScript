@@ -364,8 +364,13 @@ class QualityPostprocessor(yt_dlp.postprocessor.PostProcessor):
         source_format_id = None
 
         formats_sorted_by_height = sorted(info["formats"], key=lambda x: x.get("height", 0))
-        #with open("quality_postprocessor_test.json", "w+") as f:
+
+        #with open("video_info.json", "w+") as f:
         #    json.dump(info, f, indent=2)
+        #
+        #with open("formats_sorted_by_height.json", "w+") as f:
+        #    json.dump(formats_sorted_by_height, f, indent=2)
+
         #print(f"formats_sorted_by_height: {formats_sorted_by_height}")
         for quality_format in formats_sorted_by_height:
             if quality_format["vcodec"] == "none":
@@ -373,7 +378,13 @@ class QualityPostprocessor(yt_dlp.postprocessor.PostProcessor):
                 continue
 
             format_id = quality_format["format_id"]
-            height = quality_format["height"]
+            # some videos e.g. https://www.twitch.tv/videos/118628100
+            # have no height associated with some formats
+            # not really sure how to integrate this into the current quality filtering logic, so just skip these for now
+            height = quality_format.get("height")
+            if height is None:
+                continue
+
             tbr = quality_format["tbr"]
             is_source = QualityPostprocessor.is_format_source(quality_format)
 
@@ -414,7 +425,10 @@ class QualityPostprocessor(yt_dlp.postprocessor.PostProcessor):
         # include audio format just in case somehow, the best video format has no audio
         new_formats = [quality_format for quality_format in info["formats"] if quality_format["format_id"] == best_format_id or (quality_format["acodec"] != "none" and quality_format["vcodec"] == "none")]
 
-        info["formats"] = new_formats
+        # if we somehow can't find any formats, then just try to download anything
+        if len(new_formats) != 0:
+            info["formats"] = new_formats
+
         #print(f"Post processor info: {info}")
 
         return [], info
