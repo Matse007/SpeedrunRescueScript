@@ -408,7 +408,7 @@ class QualityPostprocessor(yt_dlp.postprocessor.PostProcessor):
 
         # Sometimes, the source format size can be less than encoded formats at a lower resolution
         # if this is true for the best format we picked, then choose the source format
-        if source_format is not None and source_format["tbr"] < best_tbr:
+        if source_format is not None and source_format.get("tbr") is not None and best_tbr is not None and source_format["tbr"] < best_tbr:
             best_format_id = source_format["format_id"]
 
         # include audio format just in case somehow, the best video format has no audio
